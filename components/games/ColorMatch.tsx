@@ -15,16 +15,21 @@ const ALL_COLORS = [
   { name: 'PINK', hex: '#ec4899' },
 ];
 
+const ACTIVE_COLORS_BY_DIFFICULTY = {
+  easy: ALL_COLORS.slice(0, 3),
+  medium: ALL_COLORS.slice(0, 5),
+  hard: ALL_COLORS,
+} as const;
+
 export function ColorMatch() {
   const [wordIndex, setWordIndex] = useState(0);
   const [colorIndex, setColorIndex] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const difficulty = useMoodStore((state) => state.difficulty);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nextRoundTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const activeColors = difficulty === 'easy' ? ALL_COLORS.slice(0, 3) : 
-                       difficulty === 'medium' ? ALL_COLORS.slice(0, 5) : 
-                       ALL_COLORS;
+  const activeColors = ACTIVE_COLORS_BY_DIFFICULTY[difficulty];
 
   const [randomRotation, setRandomRotation] = useState(0);
 
@@ -45,6 +50,7 @@ export function ColorMatch() {
     setRandomRotation(difficulty === 'hard' ? (Math.random() - 0.5) * 20 : 0);
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (nextRoundTimeoutRef.current) clearTimeout(nextRoundTimeoutRef.current);
 
     if (difficulty === 'hard') {
       timeoutRef.current = setTimeout(() => {
@@ -76,7 +82,7 @@ export function ColorMatch() {
       }
     }
 
-    setTimeout(() => {
+    nextRoundTimeoutRef.current = setTimeout(() => {
       generateNext();
     }, 400);
   };
@@ -85,6 +91,7 @@ export function ColorMatch() {
     generateNext();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (nextRoundTimeoutRef.current) clearTimeout(nextRoundTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [difficulty]);

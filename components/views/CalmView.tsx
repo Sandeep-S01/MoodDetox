@@ -1,7 +1,7 @@
 'use client';
 
 import { useMoodStore } from '@/store/useMoodStore';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { ParticleCanvas } from '@/components/calm/ParticleCanvas';
@@ -10,21 +10,31 @@ import { playClick } from '@/lib/audio';
 const CALM_DURATION = 60; // 60 seconds
 
 export function CalmView() {
-  const { reset, endActivity } = useMoodStore();
+  const reset = useMoodStore((state) => state.reset);
+  const endActivity = useMoodStore((state) => state.endActivity);
   const [timeLeft, setTimeLeft] = useState(CALM_DURATION);
+  const hasCompletedRef = useRef(false);
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      endActivity(0, 'You are refreshed');
+    hasCompletedRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (timeLeft > 0 || hasCompletedRef.current) {
       return;
     }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft, endActivity]);
+    hasCompletedRef.current = true;
+    endActivity(0, 'You are refreshed');
+  }, [endActivity, timeLeft]);
 
   return (
     <div className="w-full h-full relative bg-background transition-colors duration-1000">

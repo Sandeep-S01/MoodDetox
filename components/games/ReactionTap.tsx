@@ -11,6 +11,7 @@ export function ReactionTap() {
   const [size, setSize] = useState(80);
   const difficulty = useMoodStore((state) => state.difficulty);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const respawnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const moveTarget = () => {
     // Random position within a reasonable bound (assuming container is roughly 300x400)
@@ -34,11 +35,12 @@ export function ReactionTap() {
     setIsVisible(true);
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (respawnTimeoutRef.current) clearTimeout(respawnTimeoutRef.current);
 
     if (timeoutMs > 0) {
       timeoutRef.current = setTimeout(() => {
         setIsVisible(false);
-        setTimeout(moveTarget, 200);
+        respawnTimeoutRef.current = setTimeout(moveTarget, 200);
       }, timeoutMs);
     }
   };
@@ -47,6 +49,7 @@ export function ReactionTap() {
     moveTarget();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (respawnTimeoutRef.current) clearTimeout(respawnTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [difficulty]);
@@ -55,13 +58,14 @@ export function ReactionTap() {
     if (!isVisible) return;
     
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (respawnTimeoutRef.current) clearTimeout(respawnTimeoutRef.current);
     
     playPop();
     setIsVisible(false);
     useMoodStore.setState((state) => ({ score: state.score + 1 }));
     
     // Respawn after a short delay
-    setTimeout(() => {
+    respawnTimeoutRef.current = setTimeout(() => {
       moveTarget();
     }, 200);
   };

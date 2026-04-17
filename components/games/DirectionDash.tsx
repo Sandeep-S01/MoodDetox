@@ -6,6 +6,12 @@ import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'] as const;
 type Direction = typeof DIRECTIONS[number];
+const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
+  up: 'down',
+  down: 'up',
+  left: 'right',
+  right: 'left',
+};
 
 const ICONS = {
   up: ArrowUp,
@@ -51,13 +57,7 @@ export function DirectionDash() {
     } else {
       let correctDir = targetDir;
       if (isOpposite) {
-        const opposites: Record<Direction, Direction> = {
-          up: 'down',
-          down: 'up',
-          left: 'right',
-          right: 'left',
-        };
-        correctDir = opposites[targetDir];
+        correctDir = OPPOSITE_DIRECTIONS[targetDir];
       }
 
       if (tappedDir === correctDir) {

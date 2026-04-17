@@ -18,7 +18,9 @@ const ACTIVITY_NAMES: Record<Exclude<Activity, null>, string> = {
 };
 
 export function ChallengePromptView() {
-  const { challenge, startActivity, reset } = useMoodStore();
+  const challenge = useMoodStore((state) => state.challenge);
+  const startActivity = useMoodStore((state) => state.startActivity);
+  const reset = useMoodStore((state) => state.reset);
 
   if (!challenge) {
     return null;
@@ -32,7 +34,7 @@ export function ChallengePromptView() {
   };
 
   return (
-    <ViewFrame className="shell-page flex min-h-full max-w-2xl items-center">
+    <ViewFrame className="shell-page flex min-h-full max-w-2xl items-start sm:items-center">
       <Panel tone="raised" padding="lg" className="w-full text-center">
         <motion.div
           initial={{ scale: 0.96, opacity: 0 }}

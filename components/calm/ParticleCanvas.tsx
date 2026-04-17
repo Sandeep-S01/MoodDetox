@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 
+const PARTICLE_COLORS = ['#14b8a6', '#0ea5e9', '#6366f1'];
+const POINTER_RESET = -1000;
+
 class Particle {
   x: number;
   y: number;
@@ -24,8 +27,7 @@ class Particle {
     this.vy = 0;
     this.baseSize = Math.random() * 2 + 1;
     this.currentSize = this.baseSize;
-    const colors = ['#14b8a6', '#0ea5e9', '#6366f1']; // Teal, Sky, Indigo
-    this.color = colors[Math.floor(Math.random() * colors.length)];
+    this.color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
     this.baseAlpha = 0.3;
     this.currentAlpha = this.baseAlpha;
   }
@@ -33,15 +35,16 @@ class Particle {
   update(mouseX: number, mouseY: number) {
     const dx = mouseX - this.x;
     const dy = mouseY - this.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
+    const distanceSq = dx * dx + dy * dy;
     const maxDistance = 150;
+    const maxDistanceSq = maxDistance * maxDistance;
     
     // Default targets
     let targetSize = this.baseSize;
     let targetAlpha = this.baseAlpha;
 
-    if (distance < maxDistance) {
+    if (distanceSq < maxDistanceSq) {
+      const distance = Math.sqrt(distanceSq) || 1;
       const force = (maxDistance - distance) / maxDistance;
       
       // Movement force
@@ -91,15 +94,16 @@ export function ParticleCanvas() {
 
     let particles: Particle[] = [];
     let animationFrameId: number;
-    let mouseX = -1000;
-    let mouseY = -1000;
+    let resizeFrameId = 0;
+    let mouseX = POINTER_RESET;
+    let mouseY = POINTER_RESET;
 
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       
       particles = [];
-      const spacing = 20;
+      const spacing = window.matchMedia('(pointer: coarse)').matches ? 24 : 20;
       const cols = Math.floor(canvas.width / spacing);
       const rows = Math.floor(canvas.height / spacing);
 
@@ -115,11 +119,12 @@ export function ParticleCanvas() {
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      particles.forEach(p => {
-        p.update(mouseX, mouseY);
-        p.draw(ctx);
-      });
+
+      for (let i = 0; i < particles.length; i += 1) {
+        const particle = particles[i];
+        particle.update(mouseX, mouseY);
+        particle.draw(ctx);
+      }
 
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -135,13 +140,18 @@ export function ParticleCanvas() {
     };
 
     const handleMouseLeave = () => {
-      mouseX = -1000;
-      mouseY = -1000;
+      mouseX = POINTER_RESET;
+      mouseY = POINTER_RESET;
     };
 
-    window.addEventListener('resize', init);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchmove', handleMouseMove);
+    const handleResize = () => {
+      cancelAnimationFrame(resizeFrameId);
+      resizeFrameId = requestAnimationFrame(init);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('touchmove', handleMouseMove, { passive: true });
     window.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('touchend', handleMouseLeave);
 
@@ -149,11 +159,12 @@ export function ParticleCanvas() {
     animate();
 
     return () => {
-      window.removeEventListener('resize', init);
+      window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('touchmove', handleMouseMove);
       window.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('touchend', handleMouseLeave);
+      cancelAnimationFrame(resizeFrameId);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

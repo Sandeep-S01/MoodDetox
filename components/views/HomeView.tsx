@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ChangeEvent, type ElementType } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useMoodStore, type Activity, type Mood } from '@/store/useMoodStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AnimatePresence, motion } from 'motion/react';
@@ -29,7 +29,7 @@ import { Panel, ScreenHeader, SegmentedControl, ShellButton, StatChip, ViewFrame
 import { cn } from '@/lib/utils';
 
 const HOME_TAB_OPTIONS = [
-  { id: 'sanctuary', label: 'Sanctuary', shortLabel: 'Reset', icon: Leaf },
+  { id: 'sanctuary', label: 'Sanctuary', shortLabel: 'Play', icon: Leaf },
   { id: 'library', label: 'Library', shortLabel: 'Library', icon: Gamepad2 },
   { id: 'pulse', label: 'Pulse', shortLabel: 'Pulse', icon: HeartPulse },
   { id: 'reflect', label: 'Reflect', shortLabel: 'Reflect', icon: Sparkles },
@@ -47,6 +47,8 @@ const MOODS: {
   headline: string;
   summary: string;
   meta: string;
+  modeLabel: string;
+  ctaLabel: string;
   icon: ElementType;
   activity: Activity;
   isCalm: boolean;
@@ -54,6 +56,7 @@ const MOODS: {
   toneClass: string;
   badgeClass: string;
   ctaClass: string;
+  featured?: boolean;
 }[] = [
   {
     id: 'tired',
@@ -61,6 +64,8 @@ const MOODS: {
     headline: 'Reflex Run',
     summary: 'Wake up fast with a short target-tap round that pushes your reactions.',
     meta: '30 sec / action',
+    modeLabel: 'Reflex round',
+    ctaLabel: 'Start sprint',
     icon: Moon,
     activity: 'reaction',
     isCalm: false,
@@ -75,6 +80,8 @@ const MOODS: {
     headline: 'Breathing Field',
     summary: 'Slow down with a guided particle-breathing space built for quick decompression.',
     meta: '60 sec / calm',
+    modeLabel: 'Calm round',
+    ctaLabel: 'Start calm',
     icon: Wind,
     activity: 'particles',
     isCalm: true,
@@ -82,6 +89,7 @@ const MOODS: {
     toneClass: 'text-teal-500',
     badgeClass: 'bg-teal-500/12 text-teal-500',
     ctaClass: 'bg-teal-500 text-white',
+    featured: true,
   },
   {
     id: 'bored',
@@ -89,6 +97,8 @@ const MOODS: {
     headline: 'Focus Shuffle',
     summary: 'Jump into a random brain mini-game to reset attention and build momentum.',
     meta: '30 sec / random',
+    modeLabel: 'Random round',
+    ctaLabel: 'Surprise me',
     icon: Zap,
     activity: 'color',
     isCalm: false,
@@ -121,11 +131,22 @@ const LIBRARY_ITEMS: {
 type Tab = 'sanctuary' | 'library' | 'pulse' | 'reflect';
 
 export function HomeView() {
-  const { difficulty, mood, setDifficulty, setMood, startActivity, streak, totalSessions, initStats, setView } = useMoodStore();
+  const difficulty = useMoodStore((state) => state.difficulty);
+  const mood = useMoodStore((state) => state.mood);
+  const streak = useMoodStore((state) => state.streak);
+  const totalSessions = useMoodStore((state) => state.totalSessions);
+  const setDifficulty = useMoodStore((state) => state.setDifficulty);
+  const setMood = useMoodStore((state) => state.setMood);
+  const startActivity = useMoodStore((state) => state.startActivity);
+  const initStats = useMoodStore((state) => state.initStats);
+  const setView = useMoodStore((state) => state.setView);
   const [activeTab, setActiveTab] = useState<Tab>('sanctuary');
   const [playingAudio, setPlayingAudio] = useState<'none' | 'ambient' | 'nature'>('none');
   const [reflectionText, setReflectionText] = useState('');
   const [hasMounted, setHasMounted] = useState(false);
+  const hasLoadedReflectionRef = useRef(false);
+  const reflectionFieldId = useId();
+  const reflectionHintId = useId();
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -138,15 +159,66 @@ export function HomeView() {
       }
     } catch (err) {
       console.warn('Failed to read reflection from localStorage:', err);
+    } finally {
+      hasLoadedReflectionRef.current = true;
     }
   }, [initStats]);
+
+  useEffect(() => {
+    if (!hasLoadedReflectionRef.current) {
+      return;
+    }
+
+    const saveTimer = window.setTimeout(() => {
+      try {
+        localStorage.setItem('mood_reset_reflection', reflectionText);
+      } catch (err) {
+        console.warn('Failed to save reflection to localStorage:', err);
+      }
+    }, 150);
+
+    return () => window.clearTimeout(saveTimer);
+  }, [reflectionText]);
 
   const fadeUpInitial = hasMounted ? { opacity: 0, y: 18 } : false;
   const reflectionPreview = reflectionText.trim()
     ? `${reflectionText.trim().slice(0, 120)}${reflectionText.trim().length > 120 ? '...' : ''}`
-    : 'Write one quick line about how the last reset felt. Notes stay on this device.';
+    : 'No note yet. After your next round, save one quick line so the reset feels more intentional.';
   const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
   const difficultyCompactLabel = difficulty === 'medium' ? 'Med' : difficultyLabel;
+  const featuredMood = MOODS.find((item) => item.featured) ?? MOODS[1];
+  const isFirstRun = totalSessions === 0;
+  const primaryHomeTitle = isFirstRun ? 'Choose your first round' : 'Choose your state';
+  const primaryHomeSubtitle = isFirstRun
+    ? 'Start with the recommended reset or jump straight into the mode that matches your mood.'
+    : 'Pick the mode that matches how you feel and jump into a short session without the extra chrome.';
+  const streakBadgeValue = isFirstRun ? 'New' : `${streak}d`;
+  const streakBadgeLabel = isFirstRun ? 'First run' : 'Streak';
+  const sessionsBadgeValue = isFirstRun ? 'Ready' : totalSessions;
+  const supportSectionTitle = isFirstRun ? 'Support tools' : 'Between-round tools';
+  const supportSectionSubtitle = isFirstRun
+    ? 'Stats, notes, and ambience stay available, but play comes first.'
+    : 'Stats, notes, and ambience stay close without crowding the main play choice.';
+  const heroChips = isFirstRun
+    ? ['3 quick modes', '30-60 sec', 'No setup']
+    : ['3 quick modes', `${difficultyLabel} level`, `${totalSessions} sessions`];
+  const pulseTitle = isFirstRun ? 'Your first run starts here' : 'Keep the streak alive';
+  const pulseCopy = isFirstRun
+    ? 'One quick round creates your streak and gives the rest of the shell something useful to track.'
+    : 'Short sessions work best when the shell stays out of the way and you return often.';
+  const pulseButtonLabel = isFirstRun ? 'Open first stats' : 'Open Pulse';
+  const pulseDetailTitle = isFirstRun
+    ? 'Start your first reset'
+    : streak > 0
+      ? `You are on a ${streak}-day run.`
+      : 'You are ready to start a new streak.';
+  const pulseDetailCopy = isFirstRun
+    ? 'Play one quick round to create your streak, unlock meaningful stats, and set the tone for the rest of the shell.'
+    : 'Frequent short rounds matter more than long sessions. Keep the shell simple, return often, and let the score build naturally.';
+  const nextMoveTitle = isFirstRun ? 'Jump into a first round' : 'Jump back into a quick reset';
+  const nextMoveCopy = isFirstRun
+    ? 'Take the recommended calm round or open the full game library if you want something faster.'
+    : 'Return to the mode picker or open the full activity library.';
 
   const handleTabChange = (tab: Tab) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -198,19 +270,15 @@ export function HomeView() {
 
   const handleReflectionChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setReflectionText(e.target.value);
-    try {
-      localStorage.setItem('mood_reset_reflection', e.target.value);
-    } catch (err) {
-      console.warn('Failed to save reflection to localStorage:', err);
-    }
   };
 
   const calmItems = LIBRARY_ITEMS.filter((item) => item.calm);
   const focusItems = LIBRARY_ITEMS.filter((item) => !item.calm);
+  const handleFeaturedStart = () => handleSelect(featuredMood);
 
   return (
     <div className="min-h-screen ambient-bg text-foreground">
-      <div className="relative isolate min-h-screen">
+      <div className="relative isolate min-h-screen overflow-x-hidden">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary/6 via-transparent to-transparent" />
         <div className="pointer-events-none absolute left-[-6rem] top-24 h-48 w-48 rounded-full bg-primary/8 blur-3xl" />
         <div className="pointer-events-none absolute right-[-5rem] top-44 h-56 w-56 rounded-full bg-surface-hover/30 blur-3xl" />
@@ -229,7 +297,7 @@ export function HomeView() {
               <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                 {!isMobile ? (
                   <>
-                    <StatChip label="Streak" value={`${streak}d`} icon={Flame} />
+                    <StatChip label="Streak" value={streakBadgeValue} icon={Flame} />
                     <StatChip label="Sessions" value={totalSessions} icon={HeartPulse} />
                   </>
                 ) : null}
@@ -273,21 +341,50 @@ export function HomeView() {
                 >
                   <ScreenHeader
                     eyebrow="Quick reset"
-                    title="Choose your state"
-                    subtitle="Pick the mode that matches how you feel and jump into a short session without the extra chrome."
-                    actions={!isMobile ? <StatChip label="Difficulty" value={difficultyLabel} icon={Target} /> : null}
+                    title={primaryHomeTitle}
+                    subtitle={primaryHomeSubtitle}
+                    actions={
+                      !isMobile ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatChip label="Difficulty" value={difficultyLabel} icon={Target} />
+                          <ShellButton variant="primary" onClick={handleFeaturedStart}>
+                            <PlayCircle className="h-4 w-4" />
+                            {isFirstRun ? `Start ${featuredMood.headline}` : `Play ${featuredMood.headline}`}
+                          </ShellButton>
+                        </div>
+                      ) : null
+                    }
                   />
 
-                  {isMobile ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
-                        <Flame className="h-3.5 w-3.5 shrink-0 text-primary/90" />
-                        <span className="shrink-0 text-sm font-display font-bold text-foreground">{`${streak}d`}</span>
-                        <span className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Streak</span>
+                  <div className="flex flex-wrap gap-2">
+                    {heroChips.map((chip) => (
+                      <div
+                        key={chip}
+                        className="rounded-full border border-border/40 bg-background/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted"
+                      >
+                        {chip}
                       </div>
-                      <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
-                        <Target className="h-3.5 w-3.5 shrink-0 text-primary/90" />
-                        <span className="shrink-0 text-sm font-display font-bold text-foreground">{difficultyCompactLabel}</span>
+                    ))}
+                  </div>
+
+                  {isMobile ? (
+                    <div className="space-y-3">
+                      <ShellButton variant="primary" onClick={handleFeaturedStart} className="w-full">
+                        <PlayCircle className="h-4 w-4" />
+                        {isFirstRun ? `Start ${featuredMood.headline}` : `Play ${featuredMood.headline}`}
+                      </ShellButton>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
+                          <Flame className="h-3.5 w-3.5 shrink-0 text-primary/90" />
+                          <span className="shrink-0 text-sm font-display font-bold text-foreground">{streakBadgeValue}</span>
+                          <span className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-muted">{streakBadgeLabel}</span>
+                        </div>
+                        <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
+                          <Target className="h-3.5 w-3.5 shrink-0 text-primary/90" />
+                          <span className="shrink-0 text-sm font-display font-bold text-foreground">{difficultyCompactLabel}</span>
+                          <span className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Level</span>
+                        </div>
                       </div>
                     </div>
                   ) : null}
@@ -306,6 +403,7 @@ export function HomeView() {
                           onClick={() => handleSelect(selectedMood)}
                           className={cn(
                             'game-panel game-panel-raised group relative isolate flex min-h-[204px] min-w-0 flex-col justify-between overflow-hidden p-4 text-left transition-transform duration-300 hover:-translate-y-1 sm:min-h-[236px] sm:p-5 lg:min-h-[250px]',
+                            selectedMood.featured && 'border-primary/35 bg-surface shadow-[0_24px_64px_-36px_rgba(12,190,172,0.4)]',
                             `mood-glow-${selectedMood.theme}`,
                           )}
                         >
@@ -320,9 +418,16 @@ export function HomeView() {
                           />
 
                           <div className="relative z-10 flex items-start justify-between gap-3">
-                            <span className={cn('rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em]', selectedMood.badgeClass)}>
-                              {selectedMood.meta}
-                            </span>
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <span className={cn('rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em]', selectedMood.badgeClass)}>
+                                {selectedMood.meta}
+                              </span>
+                              {selectedMood.featured ? (
+                                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                                  Recommended
+                                </span>
+                              ) : null}
+                            </div>
                             <div className={cn('rounded-2xl border border-white/10 p-2.5 sm:p-3', selectedMood.toneClass)}>
                               <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                             </div>
@@ -340,7 +445,7 @@ export function HomeView() {
 
                           <div className="relative z-10 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                              {selectedMood.isCalm ? 'Calm mode' : 'Game mode'}
+                              {selectedMood.modeLabel}
                             </span>
                             <span
                               className={cn(
@@ -348,7 +453,7 @@ export function HomeView() {
                                 selectedMood.ctaClass,
                               )}
                             >
-                              Start
+                              {selectedMood.ctaLabel}
                               <ArrowRight className="h-4 w-4" />
                             </span>
                           </div>
@@ -361,38 +466,35 @@ export function HomeView() {
                     <Panel tone="soft" padding="sm">
                       <div className="space-y-4">
                         <div className="space-y-1.5">
-                          <div className="section-kicker">Quick tools</div>
-                          <h3 className="text-lg font-display font-bold">Stay in flow</h3>
-                          <p className="text-sm text-muted">Check progress, swap ambience, or drop a note without breaking the game feel.</p>
+                          <div className="section-kicker">{supportSectionTitle}</div>
+                          <h3 className="text-base font-display font-bold">Keep the shell out of the way</h3>
+                          <p className="text-sm text-muted">{supportSectionSubtitle}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <StatChip label="Sessions" value={totalSessions} icon={HeartPulse} className="w-full justify-between" />
-                          <StatChip label="Difficulty" value={difficultyLabel} icon={Target} className="w-full justify-between" />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTabChange('library')}
+                            className="rounded-2xl border border-border/45 bg-background/35 px-2.5 py-3 text-center transition-colors hover:bg-surface-hover/35"
+                          >
+                            <div className="text-sm font-display font-bold">Library</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted">Modes</div>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleTabChange('pulse')}
-                            className="flex items-center justify-between rounded-2xl border border-border/45 bg-background/35 px-3 py-3 text-left transition-colors hover:bg-surface-hover/35"
+                            className="rounded-2xl border border-border/45 bg-background/35 px-2.5 py-3 text-center transition-colors hover:bg-surface-hover/35"
                           >
-                            <div>
-                              <div className="text-sm font-display font-bold">Pulse</div>
-                              <div className="text-[11px] text-muted">Stats and streak</div>
-                            </div>
-                            <HeartPulse className="h-4 w-4 text-primary" />
+                            <div className="text-sm font-display font-bold">Pulse</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted">Stats</div>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleTabChange('reflect')}
-                            className="flex items-center justify-between rounded-2xl border border-border/45 bg-background/35 px-3 py-3 text-left transition-colors hover:bg-surface-hover/35"
+                            className="rounded-2xl border border-border/45 bg-background/35 px-2.5 py-3 text-center transition-colors hover:bg-surface-hover/35"
                           >
-                            <div>
-                              <div className="text-sm font-display font-bold">Journal</div>
-                              <div className="text-[11px] text-muted">One quick note</div>
-                            </div>
-                            <Sparkles className="h-4 w-4 text-primary" />
+                            <div className="text-sm font-display font-bold">Notes</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted">Reflect</div>
                           </button>
                         </div>
 
@@ -432,80 +534,82 @@ export function HomeView() {
                       </div>
                     </Panel>
                   ) : (
-                    <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr_0.9fr]">
-                      <Panel tone="soft" padding="sm" className="h-full">
-                        <div className="flex h-full flex-col gap-4">
-                          <div className="space-y-2">
-                            <div className="section-kicker">Daily pulse</div>
-                            <h3 className="text-lg font-display font-bold">Keep the streak alive</h3>
-                            <p className="text-sm text-muted">Short sessions work best when the shell stays out of the way and you return often.</p>
-                          </div>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <StatChip label="Current streak" value={`${streak} day${streak === 1 ? '' : 's'}`} icon={Flame} className="w-full justify-between" />
-                            <StatChip label="Total resets" value={totalSessions} icon={HeartPulse} className="w-full justify-between" />
-                          </div>
-                          <ShellButton size="sm" variant="secondary" onClick={() => handleTabChange('pulse')} className="self-start">
-                            Open Pulse
-                          </ShellButton>
-                        </div>
-                      </Panel>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="section-kicker">{supportSectionTitle}</div>
+                        <p className="text-sm text-muted">{supportSectionSubtitle}</p>
+                      </div>
 
-                      <Panel tone="soft" padding="sm" className="h-full">
-                        <div className="flex h-full flex-col gap-3">
-                          <div className="space-y-2">
-                            <div className="section-kicker">Soundscape</div>
-                            <h3 className="text-lg font-display font-bold">Play with less clutter</h3>
-                            <p className="text-sm text-muted">Keep one ambience loop running in the background while you navigate the shell.</p>
-                          </div>
-
-                          {[
-                            { id: 'ambient', title: 'Ambient Drift', subtitle: 'Soft tones for calm focus', icon: Music },
-                            { id: 'nature', title: 'Nature Focus', subtitle: 'Wind and brown noise blend', icon: Sun },
-                          ].map((item) => {
-                            const Icon = item.icon;
-                            const isPlaying = playingAudio === item.id;
-
-                            return (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => handleAudioToggle(item.id as 'ambient' | 'nature')}
-                                className="flex items-center justify-between gap-3 rounded-2xl border border-border/45 bg-background/35 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover/35"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="rounded-2xl bg-surface p-2 text-primary">
-                                    <Icon className="h-4 w-4" />
-                                  </div>
-                                  <div>
-                                    <div className="font-display text-sm font-bold">{item.title}</div>
-                                    <div className="text-xs text-muted">{isPlaying ? 'Now playing' : item.subtitle}</div>
-                                  </div>
-                                </div>
-                                {isPlaying ? <PauseCircle className="h-5 w-5 text-primary" /> : <PlayCircle className="h-5 w-5 text-muted" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </Panel>
-
-                      <Panel tone="soft" padding="sm" className="h-full">
-                        <div className="flex h-full flex-col gap-4">
-                          <div className="space-y-2">
-                            <div className="section-kicker">Reflect</div>
-                            <h3 className="text-lg font-display font-bold">Keep one quick note</h3>
-                            <p className="text-sm text-muted">No feed, no clutter. Just a short checkpoint between resets.</p>
-                          </div>
-                          <div className="min-h-[96px] rounded-2xl border border-border/45 bg-background/35 p-3 text-sm leading-6 text-muted">
-                            {reflectionPreview}
-                          </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Saved locally</span>
-                            <ShellButton size="sm" variant="secondary" onClick={() => handleTabChange('reflect')}>
-                              Open journal
+                      <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+                        <Panel tone="soft" padding="sm" className="h-full">
+                          <div className="flex h-full flex-col gap-4">
+                            <div className="space-y-2">
+                              <div className="section-kicker">Daily pulse</div>
+                              <h3 className="text-lg font-display font-bold">{pulseTitle}</h3>
+                              <p className="text-sm text-muted">{pulseCopy}</p>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <StatChip label="Current streak" value={isFirstRun ? 'New' : `${streak} day${streak === 1 ? '' : 's'}`} icon={Flame} className="w-full justify-between" />
+                              <StatChip label="Total resets" value={sessionsBadgeValue} icon={HeartPulse} className="w-full justify-between" />
+                            </div>
+                            <ShellButton size="sm" variant="secondary" onClick={() => handleTabChange('pulse')} className="self-start">
+                              {pulseButtonLabel}
                             </ShellButton>
                           </div>
-                        </div>
-                      </Panel>
+                        </Panel>
+
+                        <Panel tone="soft" padding="sm" className="h-full border-border/30 bg-background/20">
+                          <div className="flex h-full flex-col gap-4">
+                            <div className="space-y-2">
+                              <div className="section-kicker">Support tray</div>
+                              <h3 className="text-base font-display font-bold">Ambience and notes stay in the background</h3>
+                              <p className="text-sm text-muted">Useful between rounds, but never louder than the game modes above.</p>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {[
+                                { id: 'ambient', title: 'Ambient Drift', subtitle: 'Soft tones for calm focus', icon: Music },
+                                { id: 'nature', title: 'Nature Focus', subtitle: 'Wind and brown noise blend', icon: Sun },
+                              ].map((item) => {
+                                const Icon = item.icon;
+                                const isPlaying = playingAudio === item.id;
+
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleAudioToggle(item.id as 'ambient' | 'nature')}
+                                    className="flex items-center justify-between gap-3 rounded-2xl border border-border/35 bg-background/30 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover/30"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="rounded-2xl bg-surface p-2 text-primary">
+                                        <Icon className="h-4 w-4" />
+                                      </div>
+                                      <div>
+                                        <div className="font-display text-sm font-bold">{item.title}</div>
+                                        <div className="text-xs text-muted">{isPlaying ? 'Now playing' : item.subtitle}</div>
+                                      </div>
+                                    </div>
+                                    {isPlaying ? <PauseCircle className="h-5 w-5 text-primary" /> : <PlayCircle className="h-5 w-5 text-muted" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="rounded-[1.25rem] border border-border/35 bg-background/30 p-3.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1.5">
+                                  <div className="section-kicker">Reflection</div>
+                                  <p className="text-sm leading-6 text-muted">{reflectionPreview}</p>
+                                </div>
+                                <ShellButton size="sm" variant="ghost" onClick={() => handleTabChange('reflect')} className="shrink-0">
+                                  Write note
+                                </ShellButton>
+                              </div>
+                            </div>
+                          </div>
+                        </Panel>
+                      </div>
                     </div>
                   )}
                 </motion.section>
@@ -682,12 +786,8 @@ export function HomeView() {
                     <Panel tone="soft">
                       <div className="space-y-3">
                         <div className="section-kicker">What it means</div>
-                        <h3 className="text-lg font-display font-bold">
-                          {streak > 0 ? `You are on a ${streak}-day run.` : 'You are ready to start a new streak.'}
-                        </h3>
-                        <p className="text-sm leading-6 text-muted">
-                          Frequent short rounds matter more than long sessions. Keep the shell simple, return often, and let the score build naturally.
-                        </p>
+                        <h3 className="text-lg font-display font-bold">{pulseDetailTitle}</h3>
+                        <p className="text-sm leading-6 text-muted">{pulseDetailCopy}</p>
                       </div>
                     </Panel>
 
@@ -695,12 +795,12 @@ export function HomeView() {
                       <div className="flex h-full flex-col justify-between gap-4">
                         <div className="space-y-2">
                           <div className="section-kicker">Next move</div>
-                          <h3 className="text-lg font-display font-bold">Jump back into a quick reset</h3>
-                          <p className="text-sm text-muted">Return to the mode picker or open the full activity library.</p>
+                          <h3 className="text-lg font-display font-bold">{nextMoveTitle}</h3>
+                          <p className="text-sm text-muted">{nextMoveCopy}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <ShellButton variant="primary" onClick={() => handleTabChange('sanctuary')}>
-                            Open Sanctuary
+                          <ShellButton variant="primary" onClick={handleFeaturedStart}>
+                            {isFirstRun ? `Start ${featuredMood.headline}` : `Play ${featuredMood.headline}`}
                           </ShellButton>
                           <ShellButton variant="secondary" onClick={() => handleTabChange('library')}>
                             Open Library
@@ -730,13 +830,18 @@ export function HomeView() {
 
                   <Panel tone="raised" padding="lg">
                     <div className="space-y-4">
-                      <div className="rounded-2xl border border-border/45 bg-background/35 p-4 text-sm text-muted">
+                      <div id={reflectionHintId} className="rounded-2xl border border-border/45 bg-background/35 p-4 text-sm text-muted">
                         Short notes help you track what state you came in with and which mode helped most.
                       </div>
+                      <label htmlFor={reflectionFieldId} className="sr-only">
+                        Reflection note
+                      </label>
                       <textarea
+                        id={reflectionFieldId}
                         value={reflectionText}
                         onChange={handleReflectionChange}
                         placeholder="What changed after this reset?"
+                        aria-describedby={reflectionHintId}
                         className="min-h-[320px] w-full resize-none rounded-[1.3rem] border border-border/45 bg-background/35 p-4 text-base text-foreground outline-none transition-colors placeholder:text-muted/60 focus:border-primary/55"
                       />
                     </div>
@@ -755,7 +860,7 @@ export function HomeView() {
                   const Icon = option.icon;
                   const isActive = activeTab === option.id;
                   const mobileLabel =
-                    option.id === 'library' ? 'Games' : option.id === 'pulse' ? 'Stats' : option.id === 'reflect' ? 'Notes' : option.shortLabel;
+                    option.id === 'sanctuary' ? 'Play' : option.id === 'library' ? 'Games' : option.id === 'pulse' ? 'Stats' : 'Notes';
 
                   return (
                     <button
@@ -763,7 +868,7 @@ export function HomeView() {
                       type="button"
                       onClick={() => handleTabChange(option.id)}
                       className={cn(
-                        'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.95rem] px-1 py-1.5 text-[8px] font-bold uppercase tracking-[0.1em] transition-colors',
+                        'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.95rem] px-0.5 py-1.5 text-[7px] font-bold uppercase tracking-[0.06em] transition-colors min-[360px]:px-1 min-[360px]:text-[8px] min-[360px]:tracking-[0.1em]',
                         isActive ? 'bg-primary text-primary-fg' : 'text-muted',
                       )}
                     >

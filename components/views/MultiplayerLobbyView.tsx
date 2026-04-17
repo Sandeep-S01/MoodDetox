@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMoodStore, type Activity, type Difficulty } from '@/store/useMoodStore';
 import { beginMultiplayerMatch, disconnectPeer, initPeer, sendMultiplayerDifficulty } from '@/lib/peer';
 import { playClick } from '@/lib/audio';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, CheckCircle2, Gamepad2, Loader2, Play, QrCode, Signal, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, Gamepad2, Loader2, Play, QrCode, Signal, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Panel, ScreenHeader, SegmentedControl, ShellButton, ViewFrame } from '@/components/ui/game-shell';
 import { cn } from '@/lib/utils';
@@ -25,8 +25,25 @@ const DIFFICULTY_OPTIONS = [
 ] as const;
 
 export function MultiplayerLobbyView() {
-  const { connectionStatus, difficulty, multiplayerRole, peerId, setDifficulty, setMultiplayerState, setView, startActivity } = useMoodStore();
+  const connectionStatus = useMoodStore((state) => state.connectionStatus);
+  const difficulty = useMoodStore((state) => state.difficulty);
+  const multiplayerRole = useMoodStore((state) => state.multiplayerRole);
+  const peerId = useMoodStore((state) => state.peerId);
+  const setDifficulty = useMoodStore((state) => state.setDifficulty);
+  const setMultiplayerState = useMoodStore((state) => state.setMultiplayerState);
+  const setView = useMoodStore((state) => state.setView);
+  const startActivity = useMoodStore((state) => state.startActivity);
   const [selectedActivity, setSelectedActivity] = useState<MultiplayerActivity>('reaction');
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const copyResetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     initPeer();
@@ -65,11 +82,38 @@ export function MultiplayerLobbyView() {
   };
 
   const joinUrl = typeof window !== 'undefined' && peerId ? `${window.location.origin}${window.location.pathname}?join=${peerId}` : '';
+  const rawLobbyCode = peerId ? peerId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() : '';
+  const lobbyCode = rawLobbyCode ? rawLobbyCode.match(/.{1,4}/g)?.join('-') ?? rawLobbyCode : '----';
+  const copyLabel = copyState === 'copied' ? 'Invite copied' : copyState === 'error' ? 'Copy failed' : 'Copy invite link';
+
+  const handleCopyInviteLink = async () => {
+    playClick();
+
+    if (!joinUrl || !navigator.clipboard?.writeText) {
+      setCopyState('error');
+    } else {
+      try {
+        await navigator.clipboard.writeText(joinUrl);
+        setCopyState('copied');
+      } catch {
+        setCopyState('error');
+      }
+    }
+
+    if (copyResetTimerRef.current !== null) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+
+    copyResetTimerRef.current = window.setTimeout(() => {
+      setCopyState('idle');
+      copyResetTimerRef.current = null;
+    }, 2200);
+  };
 
   return (
     <ViewFrame className="shell-page max-w-3xl">
       <div className="space-y-5">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <ShellButton size="icon" variant="secondary" onClick={handleBack} aria-label="Back to home">
             <ArrowLeft className="h-4 w-4" />
           </ShellButton>
@@ -111,7 +155,7 @@ export function MultiplayerLobbyView() {
           ) : null}
 
           {peerId && multiplayerRole !== 'guest' ? (
-            <Panel tone="raised" padding="lg">
+            <Panel tone="raised" padding="md" className="mx-auto w-full max-w-2xl">
               <AnimatePresence mode="wait">
                 {connectionStatus !== 'connected' ? (
                   <motion.div
@@ -119,27 +163,50 @@ export function MultiplayerLobbyView() {
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    className="space-y-6 text-center"
+                    className="space-y-5 text-center"
                   >
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 text-primary">
-                      <QrCode className="h-8 w-8" />
+                    <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-green-500/12 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-green-500">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Lobby ready
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
+                      <QrCode className="h-7 w-7" />
+                    </div>
+
+                    <div className="space-y-2.5">
                       <div className="section-kicker">Invite friend</div>
-                      <h3 className="text-xl font-display font-bold">Share the join code</h3>
-                      <p className="mx-auto max-w-lg text-sm text-muted">
-                        Let the second player scan this QR code or open the generated join link.
+                      <h3 className="text-xl font-display font-bold sm:text-2xl">Scan or copy the invite link</h3>
+                      <p className="mx-auto max-w-md text-sm leading-6 text-muted">
+                        The QR works fastest. If scanning is awkward, copy the invite link and send it directly. Keep the short lobby code handy so both players know they are joining the same room.
                       </p>
                     </div>
 
-                    <div className="mx-auto w-fit rounded-[1.4rem] border border-border/45 bg-white p-4 shadow-sm">
-                      {joinUrl ? <QRCodeSVG value={joinUrl} size={176} /> : <div className="h-[176px] w-[176px] animate-pulse rounded-xl bg-gray-100" />}
+                    <div className="mx-auto w-fit rounded-[1.25rem] border border-border/45 bg-white p-3.5 shadow-sm">
+                      {joinUrl ? <QRCodeSVG value={joinUrl} size={160} /> : <div className="h-[160px] w-[160px] animate-pulse rounded-xl bg-gray-100" />}
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-full border border-border/45 bg-background/35 px-4 py-2 text-sm text-muted">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      Waiting for player to connect
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                      <div className="rounded-[1.15rem] border border-border/45 bg-background/35 px-4 py-3 text-left">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Lobby code</div>
+                        <div className="mt-1 font-mono text-lg font-bold tracking-[0.18em] text-foreground">{lobbyCode}</div>
+                      </div>
+
+                      <ShellButton variant="primary" onClick={handleCopyInviteLink} className="w-full sm:w-auto">
+                        <Copy className="h-4 w-4" />
+                        {copyLabel}
+                      </ShellButton>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="inline-flex items-center justify-center gap-2 rounded-full border border-border/45 bg-background/35 px-4 py-2 text-sm text-muted">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        Waiting for second player
+                      </div>
+
+                      <ShellButton variant="secondary" onClick={handleBack} className="w-full sm:w-auto">
+                        Cancel lobby
+                      </ShellButton>
                     </div>
                   </motion.div>
                 ) : (

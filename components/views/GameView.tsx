@@ -19,8 +19,35 @@ import { cn } from '@/lib/utils';
 
 const GAME_DURATION = 30;
 
+const MODE_NAMES = {
+  particles: 'Breathing Field',
+  reaction: 'Reaction Tap',
+  color: 'Color Match',
+  memory: 'Memory Flash',
+  direction: 'Direction Dash',
+  rulebreaker: 'Rule Breaker',
+  mirrorlogic: 'Mirror Logic',
+  simonparadox: 'Simon Paradox',
+} as const;
+
+const MODE_INSTRUCTIONS = {
+  particles: 'Breathe and interact.',
+  reaction: 'Tap the targets as fast as you can.',
+  color: 'Follow the word, not the text color.',
+  memory: 'Watch the sequence, then repeat it.',
+  direction: 'Tap the opposite direction of the arrow.',
+  rulebreaker: 'Follow the rule: match or mismatch.',
+  mirrorlogic: 'Tap the mirrored position.',
+  simonparadox: 'Only tap when Simon says.',
+} as const;
+
 export function GameView() {
-  const { activity, endActivity, isMultiplayer, opponentScore, reset, score } = useMoodStore();
+  const activity = useMoodStore((state) => state.activity);
+  const endActivity = useMoodStore((state) => state.endActivity);
+  const isMultiplayer = useMoodStore((state) => state.isMultiplayer);
+  const opponentScore = useMoodStore((state) => state.opponentScore);
+  const reset = useMoodStore((state) => state.reset);
+  const score = useMoodStore((state) => state.score);
   const isMobile = useIsMobile();
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [showCountdown, setShowCountdown] = useState(true);
@@ -54,48 +81,6 @@ export function GameView() {
       stroke: 'stroke-primary',
       glow: '',
     };
-  };
-
-  const getModeName = () => {
-    switch (activity) {
-      case 'reaction':
-        return 'Reaction Tap';
-      case 'color':
-        return 'Color Match';
-      case 'memory':
-        return 'Memory Flash';
-      case 'direction':
-        return 'Direction Dash';
-      case 'rulebreaker':
-        return 'Rule Breaker';
-      case 'mirrorlogic':
-        return 'Mirror Logic';
-      case 'simonparadox':
-        return 'Simon Paradox';
-      default:
-        return 'Get Ready';
-    }
-  };
-
-  const getInstructions = () => {
-    switch (activity) {
-      case 'reaction':
-        return 'Tap the targets as fast as you can.';
-      case 'color':
-        return 'Follow the word, not the text color.';
-      case 'memory':
-        return 'Watch the sequence, then repeat it.';
-      case 'direction':
-        return 'Tap the opposite direction of the arrow.';
-      case 'rulebreaker':
-        return 'Follow the rule: match or mismatch.';
-      case 'mirrorlogic':
-        return 'Tap the mirrored position.';
-      case 'simonparadox':
-        return 'Only tap when Simon says.';
-      default:
-        return 'Get ready.';
-    }
   };
 
   useEffect(() => {
@@ -158,7 +143,8 @@ export function GameView() {
   }, [showCountdown]);
 
   const { glow: glowClass, stroke: strokeColor, text: textColor } = getTimerStyles(timeLeft);
-  const instructionHint = getInstructions();
+  const modeName = activity ? MODE_NAMES[activity] : 'Get Ready';
+  const instructionHint = activity ? MODE_INSTRUCTIONS[activity] : 'Get ready.';
 
   if (showCountdown) {
     return (
@@ -167,7 +153,7 @@ export function GameView() {
           <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-4">
             <div className="section-kicker">Starting round</div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-display font-bold sm:text-3xl">{getModeName()}</h2>
+              <h2 className="text-2xl font-display font-bold sm:text-3xl">{modeName}</h2>
               <p className="text-sm text-muted">{instructionHint}</p>
             </div>
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border/45 bg-background/35 text-5xl font-display font-black text-primary sm:h-24 sm:w-24 sm:text-6xl">
@@ -194,16 +180,16 @@ export function GameView() {
         <div className="hud-strip grid w-full max-w-3xl grid-cols-[minmax(66px,auto)_1fr_minmax(66px,auto)] items-center gap-2 px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2">
             {isMultiplayer ? (
-              <div className="rounded-2xl bg-background/35 px-2.5 py-2 sm:px-3">
+              <div className="rounded-2xl bg-background/35 px-2 py-1.5 sm:px-3 sm:py-2">
                 <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-[10px] sm:tracking-[0.22em]">
                   <Users className="h-3.5 w-3.5 text-primary" />
-                  Friend
+                  {!isMobile ? 'Friend' : null}
                 </div>
                 <motion.div
                   key={opponentScore}
                   initial={{ scale: 1.15, color: 'var(--color-primary)' }}
                   animate={{ scale: 1, color: 'var(--color-foreground)' }}
-                  className="text-xl font-display font-bold sm:text-2xl"
+                  className="text-lg font-display font-bold sm:text-2xl"
                 >
                   {opponentScore}
                 </motion.div>
@@ -260,19 +246,19 @@ export function GameView() {
             {!isMobile ? (
               <div className="min-w-0">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted">Live round</div>
-                <div className="truncate text-sm font-display font-bold text-foreground">{getModeName()}</div>
+                <div className="truncate text-sm font-display font-bold text-foreground">{modeName}</div>
                 <div className="max-w-[220px] truncate text-[11px] text-muted/80">{instructionHint}</div>
               </div>
             ) : null}
           </div>
 
-          <div className="justify-self-end rounded-2xl bg-background/35 px-2.5 py-2 text-right sm:px-3">
+          <div className="justify-self-end rounded-2xl bg-background/35 px-2 py-1.5 text-right sm:px-3 sm:py-2">
             <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-[10px] sm:tracking-[0.22em]">{isMultiplayer ? 'You' : 'Score'}</div>
             <motion.div
               key={score}
               initial={{ scale: 1.2, color: 'var(--color-primary)' }}
               animate={{ scale: 1, color: 'var(--color-foreground)' }}
-              className="text-xl font-display font-bold sm:text-2xl"
+              className="text-lg font-display font-bold sm:text-2xl"
             >
               {score}
             </motion.div>
@@ -282,9 +268,9 @@ export function GameView() {
 
       {isMobile ? (
         <div className="absolute inset-x-0 top-[72px] z-10 flex justify-center px-3">
-          <div className="game-panel game-panel-soft flex max-w-[250px] flex-col items-center gap-1 rounded-[1.1rem] px-3 py-2 text-center">
+          <div className="game-panel game-panel-soft flex max-w-[220px] flex-col items-center gap-1 rounded-[1.1rem] px-3 py-2 text-center">
             <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Live round</div>
-            <div className="text-xs font-display font-bold">{getModeName()}</div>
+            <div className="text-xs font-display font-bold">{modeName}</div>
             <div className="max-w-full truncate text-[11px] text-muted/80">{instructionHint}</div>
           </div>
         </div>

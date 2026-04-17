@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMoodStore, Activity } from '@/store/useMoodStore';
+import { useMoodStore } from '@/store/useMoodStore';
 import { HomeView } from '@/components/views/HomeView';
 import { GameView } from '@/components/views/GameView';
 import { CalmView } from '@/components/views/CalmView';
@@ -11,6 +11,7 @@ import { MultiplayerLobbyView } from '@/components/views/MultiplayerLobbyView';
 import { SettingsView } from '@/components/views/SettingsView';
 import { AnimatePresence, motion } from 'motion/react';
 import { joinGame } from '@/lib/peer';
+import { resolveSessionEntry } from '@/lib/session-entry';
 
 export default function Page() {
   const view = useMoodStore((state) => state.view);
@@ -24,18 +25,15 @@ export default function Page() {
 
     // Parse URL parameters for challenges and multiplayer joins
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const activity = params.get('activity') as Activity;
-      const score = parseInt(params.get('score') || '0', 10);
-      const joinId = params.get('join');
+      const entryIntent = resolveSessionEntry(window.location.search);
 
-      if (joinId) {
+      if (entryIntent.type === 'join') {
         setMultiplayerState({ isMultiplayer: true });
         setView('multiplayer_lobby');
-        joinGame(joinId);
+        joinGame(entryIntent.joinId);
         window.history.replaceState({}, '', window.location.pathname);
-      } else if (activity && score > 0) {
-        setChallenge({ activity, targetScore: score });
+      } else if (entryIntent.type === 'challenge') {
+        setChallenge(entryIntent.challenge);
         setView('challenge_prompt');
         window.history.replaceState({}, '', window.location.pathname);
       }
@@ -70,7 +68,7 @@ export default function Page() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-start justify-center"
           >
             <MultiplayerLobbyView />
           </motion.div>
@@ -83,7 +81,7 @@ export default function Page() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-start justify-center"
           >
             <ChallengePromptView />
           </motion.div>
@@ -122,7 +120,7 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full overflow-y-auto overflow-x-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-start justify-center"
           >
             <ResultView />
           </motion.div>
@@ -134,7 +132,7 @@ export default function Page() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-start justify-center"
           >
             <SettingsView />
           </motion.div>

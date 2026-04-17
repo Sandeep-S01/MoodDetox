@@ -1,6 +1,6 @@
 'use client';
 
-import type { ChangeEvent } from 'react';
+import { type ChangeEvent, useId } from 'react';
 import { useMoodStore, type Difficulty, type ThemePreference } from '@/store/useMoodStore';
 import { ArrowLeft, Monitor, Moon, Sliders, Sun, Volume2, VolumeX } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -20,7 +20,18 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function SettingsView() {
-  const { difficulty, setDifficulty, volume, setVolume, soundEnabled, setSoundEnabled, theme, setTheme, setView } = useMoodStore();
+  const difficulty = useMoodStore((state) => state.difficulty);
+  const volume = useMoodStore((state) => state.volume);
+  const soundEnabled = useMoodStore((state) => state.soundEnabled);
+  const theme = useMoodStore((state) => state.theme);
+  const setDifficulty = useMoodStore((state) => state.setDifficulty);
+  const setVolume = useMoodStore((state) => state.setVolume);
+  const setSoundEnabled = useMoodStore((state) => state.setSoundEnabled);
+  const setTheme = useMoodStore((state) => state.setTheme);
+  const setView = useMoodStore((state) => state.setView);
+  const audioHeadingId = useId();
+  const audioDescriptionId = useId();
+  const volumeInputId = useId();
 
   const handleBack = () => {
     playClick();
@@ -49,7 +60,7 @@ export function SettingsView() {
   return (
     <ViewFrame className="shell-page max-w-3xl">
       <div className="space-y-5">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <ShellButton size="icon" variant="secondary" onClick={handleBack} aria-label="Back to home">
             <ArrowLeft className="h-4 w-4" />
           </ShellButton>
@@ -78,20 +89,23 @@ export function SettingsView() {
 
         <Panel tone="soft">
           <div className="space-y-5">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm font-bold">
+                <div id={audioHeadingId} className="flex items-center gap-2 text-sm font-bold">
                   <Volume2 className="h-4 w-4 text-primary" />
                   <span>Audio</span>
                 </div>
-                <p className="text-sm text-muted">Keep shell clicks, ambient audio, and calm loops available while you play.</p>
+                <p id={audioDescriptionId} className="text-sm text-muted">Keep shell clicks, ambient audio, and calm loops available while you play.</p>
               </div>
 
               <button
                 type="button"
                 onClick={handleSoundToggle}
-                className={`relative h-8 w-14 rounded-full p-1 transition-colors ${soundEnabled ? 'bg-primary' : 'bg-muted/30'}`}
-                aria-pressed={soundEnabled}
+                className={`relative h-8 w-14 shrink-0 rounded-full p-1 transition-colors ${soundEnabled ? 'bg-primary' : 'bg-muted/30'}`}
+                role="switch"
+                aria-checked={soundEnabled}
+                aria-labelledby={audioHeadingId}
+                aria-describedby={audioDescriptionId}
               >
                 <motion.div
                   className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm"
@@ -105,10 +119,21 @@ export function SettingsView() {
 
             <div className={`space-y-3 transition-opacity ${soundEnabled ? 'opacity-100' : 'pointer-events-none opacity-45'}`}>
               <div className="flex items-center justify-between text-sm font-semibold">
-                <span>Volume</span>
+                <label htmlFor={volumeInputId}>Volume</label>
                 <span className="text-muted">{Math.round(volume * 100)}%</span>
               </div>
-              <input type="range" min="0" max="1" step="0.05" value={volume} onChange={handleVolumeChange} className="w-full accent-primary" />
+              <input
+                id={volumeInputId}
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={handleVolumeChange}
+                disabled={!soundEnabled}
+                aria-describedby={audioDescriptionId}
+                className="w-full accent-primary"
+              />
             </div>
           </div>
         </Panel>

@@ -36,9 +36,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     applyTheme();
 
-    // Re-apply if time changes (only relevant for system, but safe to run periodically)
-    const interval = setInterval(applyTheme, 60000);
-    return () => clearInterval(interval);
+    if (themePreference !== 'system') {
+      return;
+    }
+
+    const interval = window.setInterval(applyTheme, 60000);
+    return () => window.clearInterval(interval);
   }, [themePreference]);
 
   return <>{children}</>;

@@ -133,6 +133,8 @@ export const toggleAmbientDrift = (play: boolean) => {
 let natureBufferSource: AudioBufferSourceNode | null = null;
 let natureGain: GainNode | null = null;
 let natureFilter: BiquadFilterNode | null = null;
+let natureNoiseBuffer: AudioBuffer | null = null;
+let natureNoiseSampleRate = 0;
 
 export const toggleNatureFocus = (play: boolean) => {
   const ctx = getAudioContext();
@@ -143,21 +145,24 @@ export const toggleNatureFocus = (play: boolean) => {
   if (play && soundEnabled) {
     if (natureGain) return; // Already playing
 
-    // Generate Brownian-like noise (filtered white noise)
-    const bufferSize = ctx.sampleRate * 2; // 2 seconds
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = buffer.getChannelData(0);
-    
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      output[i] = (lastOut + (0.02 * white)) / 1.02;
-      lastOut = output[i];
-      output[i] *= 3.5; // Compensate for volume drop
+    if (!natureNoiseBuffer || natureNoiseSampleRate !== ctx.sampleRate) {
+      const bufferSize = ctx.sampleRate * 2;
+      natureNoiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      natureNoiseSampleRate = ctx.sampleRate;
+
+      const output = natureNoiseBuffer.getChannelData(0);
+      let lastOut = 0;
+
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = output[i];
+        output[i] *= 3.5;
+      }
     }
 
     natureBufferSource = ctx.createBufferSource();
-    natureBufferSource.buffer = buffer;
+    natureBufferSource.buffer = natureNoiseBuffer;
     natureBufferSource.loop = true;
 
     // Apply a lowpass filter to make it sound like wind/ocean

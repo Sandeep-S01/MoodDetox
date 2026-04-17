@@ -2,7 +2,7 @@
 
 import { useMoodStore } from '@/store/useMoodStore';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { ArrowRight, CheckCircle2, Share2, Users, XCircle } from 'lucide-react';
 import { disconnectPeer } from '@/lib/peer';
@@ -10,8 +10,15 @@ import { playClick } from '@/lib/audio';
 import { Panel, ShellButton, ViewFrame } from '@/components/ui/game-shell';
 
 export function ResultView() {
-  const { score, resultMessage, reset, activity, challenge, isMultiplayer, opponentScore } = useMoodStore();
+  const score = useMoodStore((state) => state.score);
+  const resultMessage = useMoodStore((state) => state.resultMessage);
+  const reset = useMoodStore((state) => state.reset);
+  const activity = useMoodStore((state) => state.activity);
+  const challenge = useMoodStore((state) => state.challenge);
+  const isMultiplayer = useMoodStore((state) => state.isMultiplayer);
+  const opponentScore = useMoodStore((state) => state.opponentScore);
   const [shareText, setShareText] = useState('Challenge a Friend');
+  const shareResetTimerRef = useRef<number | null>(null);
 
   const isChallenge = challenge !== null;
   const wonChallenge = isChallenge && score > challenge.targetScore;
@@ -20,6 +27,18 @@ export function ResultView() {
   const tieMultiplayer = isMultiplayer && score === opponentScore;
 
   useEffect(() => {
+    return () => {
+      if (shareResetTimerRef.current !== null) {
+        window.clearTimeout(shareResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     if (score > 0 || wonChallenge || wonMultiplayer) {
       const duration = 3000;
       const animationEnd = Date.now() + duration;
@@ -54,7 +73,13 @@ export function ResultView() {
       } else {
         await navigator.clipboard.writeText(`${text} ${url}`);
         setShareText('Link Copied');
-        setTimeout(() => setShareText('Challenge a Friend'), 2000);
+        if (shareResetTimerRef.current !== null) {
+          window.clearTimeout(shareResetTimerRef.current);
+        }
+        shareResetTimerRef.current = window.setTimeout(() => {
+          setShareText('Challenge a Friend');
+          shareResetTimerRef.current = null;
+        }, 2000);
       }
     } catch (err) {
       console.error('Error sharing:', err);
@@ -92,7 +117,7 @@ export function ResultView() {
   }
 
   return (
-    <ViewFrame className="shell-page flex min-h-full max-w-2xl items-center">
+    <ViewFrame className="shell-page flex min-h-full max-w-2xl items-start sm:items-center">
       <motion.div
         initial={{ scale: 0.96, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
