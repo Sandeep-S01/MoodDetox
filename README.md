@@ -30,6 +30,14 @@ MoodDetox is a client-heavy Next.js game experience built around short reset ses
 2. Deploy the generated static site from:
    `out/`
 
+## GitHub Pages
+
+- This repository includes a GitHub Actions workflow at `.github/workflows/deploy-pages.yml` to deploy the static export to GitHub Pages.
+- For the `Sandeep-S01/MoodDetox` project site, the app is built to run under the `/MoodDetox` base path.
+- On GitHub, set `Settings > Pages > Source` to `GitHub Actions` if it is not already enabled.
+- After the workflow succeeds, the site will be available at:
+  `https://sandeep-s01.github.io/MoodDetox/`
+
 ## Notes
 
 - The build uses Next.js static export mode.
