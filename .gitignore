@@ -1,0 +1,14 @@
+node_modules/
+.next/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+out/
+test-results/
+playtest-artifacts/
+playtest-host-probe.png
+temp-response.html
+tsconfig.tsbuildinfo

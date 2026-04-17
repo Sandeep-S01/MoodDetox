@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-base);
+  --color-muted: var(--text-muted);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+}
+
+@layer base {
+  :root {
+    /* Default / Night (Dark, moody purples/blues) */
+    --bg-base: #0f172a;
+    --text-base: #f8fafc;
+    --text-muted: #94a3b8;
+    --surface: #1e293b;
+    --surface-hover: #334155;
+    --border: #334155;
+    --primary: #f8fafc;
+    --primary-fg: #0f172a;
+  }
+
+  .theme-night {
+    /* Default / Night (Dark, moody purples/blues) */
+    --bg-base: #0f172a;
+    --text-base: #f8fafc;
+    --text-muted: #94a3b8;
+    --surface: #1e293b;
+    --surface-hover: #334155;
+    --border: #334155;
+    --primary: #f8fafc;
+    --primary-fg: #0f172a;
+  }
+
+  .theme-morning {
+    /* Bright, energizing (yellows/oranges) */
+    --bg-base: #fffbeb;
+    --text-base: #451a03;
+    --text-muted: #92400e;
+    --surface: #fef3c7;
+    --surface-hover: #fde68a;
+    --border: #fcd34d;
+    --primary: #451a03;
+    --primary-fg: #fffbeb;
+  }
+
+  .theme-afternoon {
+    /* Bright, focused (blues/teals) */
+    --bg-base: #f0fdfa;
+    --text-base: #042f2e;
+    --text-muted: #0f766e;
+    --surface: #ccfbf1;
+    --surface-hover: #99f6e4;
+    --border: #5eead4;
+    --primary: #042f2e;
+    --primary-fg: #f0fdfa;
+  }
+
+  .theme-evening {
+    /* Warm dark (deep purples/indigos) */
+    --bg-base: #1e1b4b;
+    --text-base: #e0e7ff;
+    --text-muted: #818cf8;
+    --surface: #312e81;
+    --surface-hover: #3730a3;
+    --border: #4338ca;
+    --primary: #e0e7ff;
+    --primary-fg: #1e1b4b;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .ambient-bg {
+    background: radial-gradient(circle at 20% 30%, var(--color-surface-hover) 0%, var(--color-background) 40%, var(--color-surface) 100%);
+  }
+
+  .glass-surface {
+    background: color-mix(in srgb, var(--color-surface) 40%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-border {
+    border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+  }
+
+  .mood-glow-tired { box-shadow: 0 40px 80px -20px rgba(249, 115, 22, 0.15); }
+  .mood-glow-stressed { box-shadow: 0 40px 80px -20px rgba(20, 184, 166, 0.15); }
+  .mood-glow-bored { box-shadow: 0 40px 80px -20px rgba(168, 85, 247, 0.15); }
+
+  .inner-glow-tired { box-shadow: inset 0 0 40px rgba(253, 186, 116, 0.15); }
+  .inner-glow-stressed { box-shadow: inset 0 0 40px rgba(94, 234, 212, 0.15); }
+  .inner-glow-bored { box-shadow: inset 0 0 40px rgba(216, 180, 254, 0.15); }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+}
