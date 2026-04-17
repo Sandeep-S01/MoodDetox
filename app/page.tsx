@@ -70,7 +70,7 @@ export default function Page() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
           >
             <MultiplayerLobbyView />
           </motion.div>
@@ -83,7 +83,7 @@ export default function Page() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
           >
             <ChallengePromptView />
           </motion.div>
@@ -122,7 +122,7 @@ export default function Page() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full overflow-y-auto overflow-x-hidden flex items-center justify-center"
           >
             <ResultView />
           </motion.div>
@@ -134,7 +134,7 @@ export default function Page() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full h-full absolute inset-0 overflow-hidden flex items-center justify-center"
+            className="w-full h-full absolute inset-0 overflow-y-auto overflow-x-hidden flex items-center justify-center"
           >
             <SettingsView />
           </motion.div>

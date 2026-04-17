@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Users } from 'lucide-react';
+import { Users, X } from 'lucide-react';
 import { useMoodStore } from '@/store/useMoodStore';
 import { finishMultiplayerMatch, sendMultiplayerScore } from '@/lib/peer';
 import { playClick } from '@/lib/audio';
@@ -13,7 +13,9 @@ import { DirectionDash } from '@/components/games/DirectionDash';
 import { RuleBreaker } from '@/components/games/RuleBreaker';
 import { MirrorLogic } from '@/components/games/MirrorLogic';
 import { SimonParadox } from '@/components/games/SimonParadox';
+import { Panel, ShellButton } from '@/components/ui/game-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 const GAME_DURATION = 30;
 
@@ -52,6 +54,48 @@ export function GameView() {
       stroke: 'stroke-primary',
       glow: '',
     };
+  };
+
+  const getModeName = () => {
+    switch (activity) {
+      case 'reaction':
+        return 'Reaction Tap';
+      case 'color':
+        return 'Color Match';
+      case 'memory':
+        return 'Memory Flash';
+      case 'direction':
+        return 'Direction Dash';
+      case 'rulebreaker':
+        return 'Rule Breaker';
+      case 'mirrorlogic':
+        return 'Mirror Logic';
+      case 'simonparadox':
+        return 'Simon Paradox';
+      default:
+        return 'Get Ready';
+    }
+  };
+
+  const getInstructions = () => {
+    switch (activity) {
+      case 'reaction':
+        return 'Tap the targets as fast as you can.';
+      case 'color':
+        return 'Follow the word, not the text color.';
+      case 'memory':
+        return 'Watch the sequence, then repeat it.';
+      case 'direction':
+        return 'Tap the opposite direction of the arrow.';
+      case 'rulebreaker':
+        return 'Follow the rule: match or mismatch.';
+      case 'mirrorlogic':
+        return 'Tap the mirrored position.';
+      case 'simonparadox':
+        return 'Only tap when Simon says.';
+      default:
+        return 'Get ready.';
+    }
   };
 
   useEffect(() => {
@@ -113,127 +157,140 @@ export function GameView() {
     return () => clearInterval(timer);
   }, [showCountdown]);
 
-  const getInstructions = () => {
-    switch (activity) {
-      case 'reaction':
-        return 'Tap the targets as fast as you can!';
-      case 'color':
-        return 'Tap the color that matches the WORD, not the text color!';
-      case 'memory':
-        return 'Watch the sequence and repeat it!';
-      case 'direction':
-        return 'Tap the OPPOSITE direction of the arrow!';
-      case 'rulebreaker':
-        return 'Follow the rule: Match or Mismatch!';
-      case 'mirrorlogic':
-        return 'Tap the mirrored position!';
-      case 'simonparadox':
-        return 'Only tap if Simon says!';
-      default:
-        return 'Get ready!';
-    }
-  };
-
   const { glow: glowClass, stroke: strokeColor, text: textColor } = getTimerStyles(timeLeft);
+  const instructionHint = getInstructions();
 
   if (showCountdown) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full ambient-bg text-foreground p-8 text-center">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-8">
-          <div className="text-muted uppercase tracking-[0.3em] text-sm">Get Ready</div>
-          <h2 className="text-4xl font-display font-bold">{getInstructions()}</h2>
-          <div className="text-8xl font-display font-black text-primary animate-pulse">{countdown}</div>
-        </motion.div>
+      <div className="flex h-full w-full items-center justify-center ambient-bg px-4 py-8">
+        <Panel tone="raised" padding="lg" className="w-full max-w-md text-center sm:max-w-lg">
+          <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-4">
+            <div className="section-kicker">Starting round</div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-display font-bold sm:text-3xl">{getModeName()}</h2>
+              <p className="text-sm text-muted">{instructionHint}</p>
+            </div>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border/45 bg-background/35 text-5xl font-display font-black text-primary sm:h-24 sm:w-24 sm:text-6xl">
+              {countdown}
+            </div>
+          </motion.div>
+        </Panel>
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col items-center justify-start w-full h-full ${isMobile ? 'max-w-md' : 'max-w-4xl'} px-6 pt-12 pb-6 relative overflow-hidden`}>
-      <div className="absolute inset-0 pointer-events-none">
-        <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 ${isMobile ? 'w-64 h-64' : 'w-96 h-96'} rounded-full blur-[100px] opacity-20 animate-pulse-glow ${timeLeft <= 5 ? 'bg-red-500' : 'bg-primary'}`} />
+    <div className="relative flex h-full w-full items-stretch justify-center overflow-hidden px-2 py-2.5 sm:px-4 sm:py-4">
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className={cn(
+            'absolute left-1/2 top-[12%] h-52 w-52 -translate-x-1/2 rounded-full blur-[100px] opacity-18 animate-pulse-glow sm:h-72 sm:w-72',
+            timeLeft <= 5 ? 'bg-red-500' : 'bg-primary',
+          )}
+        />
       </div>
 
-      <div className={`grid grid-cols-3 items-center w-full mb-12 glass-surface glass-border p-4 rounded-3xl z-10 shadow-xl ${!isMobile && 'max-w-2xl'}`}>
-        <div className="flex flex-col items-start justify-center pl-2">
-          {isMultiplayer ? (
-            <>
-              <span className="text-muted uppercase text-[10px] tracking-widest mb-1 flex items-center gap-1">
-                <Users className="w-3 h-3" /> Friend
-              </span>
-              <motion.span
-                key={opponentScore}
-                initial={{ scale: 1.2, color: 'var(--color-teal-500)' }}
-                animate={{ scale: 1, color: 'var(--color-muted)' }}
-                className="text-3xl font-display font-bold text-muted"
+      <div className="absolute inset-x-0 top-2 z-20 flex justify-center px-2 sm:top-3 sm:px-3">
+        <div className="hud-strip grid w-full max-w-3xl grid-cols-[minmax(66px,auto)_1fr_minmax(66px,auto)] items-center gap-2 px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            {isMultiplayer ? (
+              <div className="rounded-2xl bg-background/35 px-2.5 py-2 sm:px-3">
+                <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-[10px] sm:tracking-[0.22em]">
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  Friend
+                </div>
+                <motion.div
+                  key={opponentScore}
+                  initial={{ scale: 1.15, color: 'var(--color-primary)' }}
+                  animate={{ scale: 1, color: 'var(--color-foreground)' }}
+                  className="text-xl font-display font-bold sm:text-2xl"
+                >
+                  {opponentScore}
+                </motion.div>
+              </div>
+            ) : (
+              <ShellButton
+                size="icon"
+                variant="secondary"
+                onClick={() => {
+                  playClick();
+                  reset();
+                }}
+                aria-label="Exit game"
               >
-                {opponentScore}
-              </motion.span>
-            </>
-          ) : (
-            <button
-              onClick={() => {
-                playClick();
-                reset();
-              }}
-              className="p-3 -ml-3 text-muted hover:text-foreground transition-colors rounded-full hover:bg-surface"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          )}
-        </div>
+                <X className="h-4 w-4" />
+              </ShellButton>
+            )}
+          </div>
 
-        <div className="flex justify-center">
-          <motion.div
-            key={timeLeft}
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ duration: 0.2 }}
-            className={`relative flex items-center justify-center w-20 h-20 transition-all duration-300 ${glowClass}`}
-          >
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="36" className="stroke-surface" strokeWidth="6" fill="none" />
-              <motion.circle
-                cx="40"
-                cy="40"
-                r="36"
-                className={strokeColor}
-                strokeWidth="6"
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray={226.2}
-                initial={{ strokeDashoffset: 0 }}
-                animate={{ strokeDashoffset: 226.2 - (226.2 * timeLeft) / GAME_DURATION }}
-                transition={{ duration: 1, ease: 'linear' }}
-              />
-            </svg>
-            <div className="absolute flex flex-col items-center justify-center">
+          <div className="flex min-w-0 items-center justify-center gap-3">
+            <motion.div
+              key={timeLeft}
+              animate={{ scale: [1, 1.03, 1] }}
+              transition={{ duration: 0.2 }}
+              className={cn('relative flex h-14 w-14 items-center justify-center transition-all duration-300 sm:h-[68px] sm:w-[68px]', glowClass)}
+            >
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="36" className="stroke-surface" strokeWidth="6" fill="none" />
+                <motion.circle
+                  cx="40"
+                  cy="40"
+                  r="36"
+                  className={strokeColor}
+                  strokeWidth="6"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={226.2}
+                  initial={{ strokeDashoffset: 0 }}
+                  animate={{ strokeDashoffset: 226.2 - (226.2 * timeLeft) / GAME_DURATION }}
+                  transition={{ duration: 1, ease: 'linear' }}
+                />
+              </svg>
               <motion.span
                 key={timeLeft}
-                initial={{ scale: 1.5, opacity: 0 }}
+                initial={{ scale: 1.3, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className={`font-mono text-2xl font-bold ${textColor}`}
+                className={cn('absolute font-mono text-lg font-bold sm:text-2xl', textColor)}
               >
                 {timeLeft}
               </motion.span>
-            </div>
-          </motion.div>
-        </div>
+            </motion.div>
 
-        <div className="flex flex-col items-end justify-center pr-2">
-          <span className="text-muted uppercase text-[10px] tracking-widest mb-1">{isMultiplayer ? 'You' : 'Score'}</span>
-          <motion.span
-            key={score}
-            initial={{ scale: 1.5, color: 'var(--color-primary)' }}
-            animate={{ scale: 1, color: 'var(--color-foreground)' }}
-            className="text-3xl font-display font-bold text-foreground"
-          >
-            {score}
-          </motion.span>
+            {!isMobile ? (
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted">Live round</div>
+                <div className="truncate text-sm font-display font-bold text-foreground">{getModeName()}</div>
+                <div className="max-w-[220px] truncate text-[11px] text-muted/80">{instructionHint}</div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="justify-self-end rounded-2xl bg-background/35 px-2.5 py-2 text-right sm:px-3">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-[10px] sm:tracking-[0.22em]">{isMultiplayer ? 'You' : 'Score'}</div>
+            <motion.div
+              key={score}
+              initial={{ scale: 1.2, color: 'var(--color-primary)' }}
+              animate={{ scale: 1, color: 'var(--color-foreground)' }}
+              className="text-xl font-display font-bold sm:text-2xl"
+            >
+              {score}
+            </motion.div>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 w-full flex items-center justify-center">
+      {isMobile ? (
+        <div className="absolute inset-x-0 top-[72px] z-10 flex justify-center px-3">
+          <div className="game-panel game-panel-soft flex max-w-[250px] flex-col items-center gap-1 rounded-[1.1rem] px-3 py-2 text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Live round</div>
+            <div className="text-xs font-display font-bold">{getModeName()}</div>
+            <div className="max-w-full truncate text-[11px] text-muted/80">{instructionHint}</div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className={cn('relative z-10 flex w-full flex-1 items-center justify-center pt-[118px] pb-2 sm:pt-24', isMobile ? 'max-w-md' : 'max-w-4xl')}>
         {activity === 'reaction' && <ReactionTap />}
         {activity === 'color' && <ColorMatch />}
         {activity === 'memory' && <MemoryFlash />}

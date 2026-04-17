@@ -4,50 +4,39 @@ import { useMoodStore } from '@/store/useMoodStore';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { ArrowRight, Share2, CheckCircle2, XCircle, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Share2, Users, XCircle } from 'lucide-react';
 import { disconnectPeer } from '@/lib/peer';
 import { playClick } from '@/lib/audio';
-
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Panel, ShellButton, ViewFrame } from '@/components/ui/game-shell';
 
 export function ResultView() {
   const { score, resultMessage, reset, activity, challenge, isMultiplayer, opponentScore } = useMoodStore();
   const [shareText, setShareText] = useState('Challenge a Friend');
-  const isMobile = useIsMobile();
 
-  // Determine if this was a challenge and if the user won
   const isChallenge = challenge !== null;
   const wonChallenge = isChallenge && score > challenge.targetScore;
-
-  // Determine multiplayer result
   const wonMultiplayer = isMultiplayer && score > opponentScore;
   const lostMultiplayer = isMultiplayer && score < opponentScore;
   const tieMultiplayer = isMultiplayer && score === opponentScore;
 
   useEffect(() => {
     if (score > 0 || wonChallenge || wonMultiplayer) {
-      const duration = 3 * 1000;
+      const duration = 3000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-      const interval = setInterval(function() {
+      const interval = setInterval(() => {
         const timeLeft = animationEnd - Date.now();
 
         if (timeLeft <= 0) {
-          return clearInterval(interval);
+          clearInterval(interval);
+          return;
         }
 
         const particleCount = 50 * (timeLeft / duration);
-        confetti({
-          ...defaults, particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        confetti({
-          ...defaults, particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
       }, 250);
 
       return () => clearInterval(interval);
@@ -57,18 +46,14 @@ export function ResultView() {
   const handleShare = async () => {
     playClick();
     const url = `${window.location.origin}${window.location.pathname}?activity=${activity}&score=${score}`;
-    const text = `I scored ${score} in MoodDetox! Can you beat my score?`;
+    const text = `I scored ${score} in MoodDetox. Can you beat it?`;
 
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: 'MoodDetox Challenge',
-          text: text,
-          url: url
-        });
+        await navigator.share({ title: 'MoodDetox Challenge', text, url });
       } else {
         await navigator.clipboard.writeText(`${text} ${url}`);
-        setShareText('Link Copied!');
+        setShareText('Link Copied');
         setTimeout(() => setShareText('Challenge a Friend'), 2000);
       }
     } catch (err) {
@@ -84,104 +69,84 @@ export function ResultView() {
     reset();
   };
 
+  let resultTitle = resultMessage;
+  let resultTone = 'text-primary';
+  let ResultIcon = CheckCircle2;
+
+  if (isChallenge) {
+    resultTitle = wonChallenge ? 'Challenge won' : 'Target missed';
+    resultTone = wonChallenge ? 'text-teal-500' : 'text-orange-500';
+    ResultIcon = wonChallenge ? CheckCircle2 : XCircle;
+  } else if (wonMultiplayer) {
+    resultTitle = 'You won';
+    resultTone = 'text-teal-500';
+    ResultIcon = CheckCircle2;
+  } else if (lostMultiplayer) {
+    resultTitle = 'You lost';
+    resultTone = 'text-orange-500';
+    ResultIcon = XCircle;
+  } else if (tieMultiplayer) {
+    resultTitle = 'Tie game';
+    resultTone = 'text-purple-500';
+    ResultIcon = Users;
+  }
+
   return (
-    <div className={`flex flex-col items-center justify-center w-full ${isMobile ? 'max-w-md' : 'max-w-2xl'} px-6 text-center`}>
+    <ViewFrame className="shell-page flex min-h-full max-w-2xl items-center">
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
+        initial={{ scale: 0.96, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', bounce: 0.5 }}
-        className={`mb-8 w-full glass-surface glass-border ${isMobile ? 'p-10' : 'p-16'} rounded-[40px] shadow-2xl relative overflow-hidden`}
+        transition={{ type: 'spring', bounce: 0.3 }}
+        className="w-full"
       >
-        {/* Decorative background element */}
-        <div className={`absolute -top-20 -right-20 ${isMobile ? 'w-40 h-40' : 'w-64 h-64'} bg-primary/10 rounded-full blur-3xl animate-pulse-glow`} />
-        
-        {isChallenge && (
-          <div className="mb-6">
-            {wonChallenge ? (
-              <div className="flex flex-col items-center text-teal-500">
-                <CheckCircle2 className="w-12 h-12 mb-2" />
-                <span className="font-display font-bold text-xl">Challenge Won!</span>
-                <span className="text-sm opacity-80">You beat their score of {challenge.targetScore}</span>
+        <Panel tone="raised" padding="lg" className="relative overflow-hidden text-center">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+
+          <div className="relative space-y-6">
+            {(isChallenge || isMultiplayer) && (
+              <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-background/35 ${resultTone}`}>
+                <ResultIcon className="h-8 w-8" />
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="section-kicker">Round complete</div>
+              <h2 className={`text-3xl font-display font-bold tracking-tight ${isChallenge || isMultiplayer ? resultTone : 'text-foreground'}`}>
+                {resultTitle}
+              </h2>
+              <p className="mx-auto max-w-lg text-sm leading-6 text-muted">
+                {isChallenge
+                  ? `Score to beat: ${challenge?.targetScore}`
+                  : isMultiplayer
+                    ? `Friend score: ${opponentScore}`
+                    : 'Short sessions count. Reset again whenever you need another quick round.'}
+              </p>
+            </div>
+
+            {activity === 'particles' ? (
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-teal-500/12">
+                <div className="h-12 w-12 rounded-full bg-teal-500/25 animate-pulse" />
               </div>
             ) : (
-              <div className="flex flex-col items-center text-orange-500">
-                <XCircle className="w-12 h-12 mb-2" />
-                <span className="font-display font-bold text-xl">Challenge Lost</span>
-                <span className="text-sm opacity-80">Target was {challenge.targetScore}</span>
-              </div>
+              <div className="text-6xl font-display font-bold text-foreground">{score}</div>
             )}
-          </div>
-        )}
 
-        {isMultiplayer && (
-          <div className="mb-6">
-            {wonMultiplayer && (
-              <div className="flex flex-col items-center text-teal-500">
-                <CheckCircle2 className="w-12 h-12 mb-2" />
-                <span className="font-display font-bold text-xl">You Won!</span>
-                <span className="text-sm opacity-80">Friend scored {opponentScore}</span>
-              </div>
-            )}
-            {lostMultiplayer && (
-              <div className="flex flex-col items-center text-orange-500">
-                <XCircle className="w-12 h-12 mb-2" />
-                <span className="font-display font-bold text-xl">You Lost</span>
-                <span className="text-sm opacity-80">Friend scored {opponentScore}</span>
-              </div>
-            )}
-            {tieMultiplayer && (
-              <div className="flex flex-col items-center text-purple-500">
-                <Users className="w-12 h-12 mb-2" />
-                <span className="font-display font-bold text-xl">It&apos;s a Tie!</span>
-                <span className="text-sm opacity-80">Both scored {score}</span>
-              </div>
-            )}
-          </div>
-        )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              {score > 0 && !isChallenge && !isMultiplayer && activity !== 'particles' ? (
+                <ShellButton variant="secondary" onClick={handleShare} className="sm:min-w-48">
+                  <Share2 className="h-4 w-4" />
+                  {shareText}
+                </ShellButton>
+              ) : null}
 
-        {activity === 'particles' ? (
-          <div className="w-24 h-24 rounded-full bg-teal-500/10 flex items-center justify-center mx-auto mb-6">
-            <div className="w-12 h-12 rounded-full bg-teal-500/20 animate-pulse" />
+              <ShellButton variant="primary" onClick={handleContinue} className="sm:min-w-40">
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </ShellButton>
+            </div>
           </div>
-        ) : (
-          <div className="text-6xl font-display font-bold text-foreground mb-2">
-            {score}
-          </div>
-        )}
-        <h2 className="text-2xl font-medium text-muted">
-          {isChallenge || isMultiplayer ? 'Your Final Score' : resultMessage}
-        </h2>
+        </Panel>
       </motion.div>
-
-      <div className="flex flex-col gap-4 w-full">
-        {score > 0 && !isChallenge && !isMultiplayer && activity !== 'particles' && (
-          <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-8 py-4 bg-surface border border-border text-foreground rounded-full font-medium hover:bg-surface-hover transition-all w-full"
-          >
-            <Share2 className="w-5 h-5" />
-            {shareText}
-          </motion.button>
-        )}
-
-        <motion.button
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleContinue}
-          className="flex items-center justify-center gap-2 px-8 py-4 bg-primary text-primary-fg rounded-full font-medium hover:opacity-90 transition-all w-full"
-        >
-          Continue
-          <ArrowRight className="w-5 h-5" />
-        </motion.button>
-      </div>
-    </div>
+    </ViewFrame>
   );
 }

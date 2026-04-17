@@ -1,72 +1,127 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useMoodStore, Mood, Activity } from '@/store/useMoodStore';
+import { useEffect, useState, type ChangeEvent, type ElementType } from 'react';
+import { useMoodStore, type Activity, type Mood } from '@/store/useMoodStore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
-  Moon, Wind, Zap, Leaf, Gamepad2, HeartPulse, Sparkles,
-  Settings, User, ArrowRight, Music, PauseCircle, Sun, PlayCircle, Plus,
-  Activity as ActivityIcon, Brain, Target, Flame, Users
+  Activity as ActivityIcon,
+  ArrowRight,
+  Brain,
+  Flame,
+  Gamepad2,
+  HeartPulse,
+  Leaf,
+  Moon,
+  Music,
+  PauseCircle,
+  PlayCircle,
+  Settings,
+  Sparkles,
+  Sun,
+  Target,
+  Users,
+  Wind,
+  Zap,
 } from 'lucide-react';
 import { toggleAmbientDrift, toggleNatureFocus, playClick, playTabSelect, setAmbientParameters } from '@/lib/audio';
+import { Panel, ScreenHeader, SegmentedControl, ShellButton, StatChip, ViewFrame } from '@/components/ui/game-shell';
+import { cn } from '@/lib/utils';
 
-const MOODS: { 
-  id: Mood; 
-  label: string; 
-  subtitle: string;
-  icon: React.ElementType; 
-  activity: Activity; 
-  isCalm: boolean; 
+const HOME_TAB_OPTIONS = [
+  { id: 'sanctuary', label: 'Sanctuary', shortLabel: 'Reset', icon: Leaf },
+  { id: 'library', label: 'Library', shortLabel: 'Library', icon: Gamepad2 },
+  { id: 'pulse', label: 'Pulse', shortLabel: 'Pulse', icon: HeartPulse },
+  { id: 'reflect', label: 'Reflect', shortLabel: 'Reflect', icon: Sparkles },
+] as const;
+
+const DIFFICULTY_OPTIONS = [
+  { id: 'easy', label: 'Easy' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'hard', label: 'Hard' },
+] as const;
+
+const MOODS: {
+  id: Exclude<Mood, null>;
+  label: string;
+  headline: string;
+  summary: string;
+  meta: string;
+  icon: ElementType;
+  activity: Activity;
+  isCalm: boolean;
   theme: string;
-  buttonText: string;
+  toneClass: string;
+  badgeClass: string;
+  ctaClass: string;
 }[] = [
   {
     id: 'tired',
     label: 'Tired',
-    subtitle: 'Recharge & Flow',
+    headline: 'Reflex Run',
+    summary: 'Wake up fast with a short target-tap round that pushes your reactions.',
+    meta: '30 sec / action',
     icon: Moon,
     activity: 'reaction',
     isCalm: false,
     theme: 'tired',
-    buttonText: 'Begin Reset'
+    toneClass: 'text-orange-500',
+    badgeClass: 'bg-orange-500/12 text-orange-500',
+    ctaClass: 'bg-orange-500 text-white',
   },
   {
     id: 'stressed',
     label: 'Stressed',
-    subtitle: 'Release & Center',
+    headline: 'Breathing Field',
+    summary: 'Slow down with a guided particle-breathing space built for quick decompression.',
+    meta: '60 sec / calm',
     icon: Wind,
     activity: 'particles',
     isCalm: true,
     theme: 'stressed',
-    buttonText: 'Start Breathing'
+    toneClass: 'text-teal-500',
+    badgeClass: 'bg-teal-500/12 text-teal-500',
+    ctaClass: 'bg-teal-500 text-white',
   },
   {
     id: 'bored',
     label: 'Bored',
-    subtitle: 'Spark & Create',
+    headline: 'Focus Shuffle',
+    summary: 'Jump into a random brain mini-game to reset attention and build momentum.',
+    meta: '30 sec / random',
     icon: Zap,
     activity: 'color',
     isCalm: false,
     theme: 'bored',
-    buttonText: 'Launch Spark'
+    toneClass: 'text-purple-500',
+    badgeClass: 'bg-purple-500/12 text-purple-500',
+    ctaClass: 'bg-purple-500 text-white',
   },
+];
+
+const LIBRARY_ITEMS: {
+  id: Exclude<Activity, null>;
+  name: string;
+  icon: ElementType;
+  calm: boolean;
+  duration: string;
+  category: string;
+  desc: string;
+}[] = [
+  { id: 'particles', name: 'Particle Breathing', icon: Wind, calm: true, duration: '60 sec', category: 'Calm', desc: 'Guide your breath with a soft particle flow.' },
+  { id: 'reaction', name: 'Reaction Tap', icon: Target, calm: false, duration: '30 sec', category: 'Reflex', desc: 'Tap the targets before they vanish.' },
+  { id: 'color', name: 'Color Match', icon: Brain, calm: false, duration: '30 sec', category: 'Focus', desc: 'Follow the word, not the ink color.' },
+  { id: 'memory', name: 'Memory Flash', icon: ActivityIcon, calm: false, duration: '30 sec', category: 'Memory', desc: 'Watch the pattern and play it back.' },
+  { id: 'direction', name: 'Direction Dash', icon: Zap, calm: false, duration: '30 sec', category: 'Opposites', desc: 'Tap the opposite direction, not the obvious one.' },
+  { id: 'rulebreaker', name: 'Rule Breaker', icon: Sparkles, calm: false, duration: '30 sec', category: 'Switching', desc: 'Adapt every few seconds as the rule changes.' },
+  { id: 'mirrorlogic', name: 'Mirror Logic', icon: Moon, calm: false, duration: '30 sec', category: 'Spatial', desc: 'Choose the mirrored position under pressure.' },
+  { id: 'simonparadox', name: 'Simon Paradox', icon: Brain, calm: false, duration: '30 sec', category: 'Control', desc: 'Only react when the instruction earns it.' },
 ];
 
 type Tab = 'sanctuary' | 'library' | 'pulse' | 'reflect';
 
 export function HomeView() {
-  const {
-    difficulty,
-    mood,
-    setDifficulty,
-    setMood,
-    startActivity,
-    streak,
-    totalSessions,
-    initStats,
-    setView
-  } = useMoodStore();
+  const { difficulty, mood, setDifficulty, setMood, startActivity, streak, totalSessions, initStats, setView } = useMoodStore();
   const [activeTab, setActiveTab] = useState<Tab>('sanctuary');
   const [playingAudio, setPlayingAudio] = useState<'none' | 'ambient' | 'nature'>('none');
   const [reflectionText, setReflectionText] = useState('');
@@ -78,34 +133,41 @@ export function HomeView() {
     initStats();
     try {
       const savedReflection = localStorage.getItem('mood_reset_reflection');
-      if (savedReflection) setReflectionText(savedReflection);
+      if (savedReflection) {
+        setReflectionText(savedReflection);
+      }
     } catch (err) {
       console.warn('Failed to read reflection from localStorage:', err);
     }
   }, [initStats]);
 
-  const fadeUpInitial = hasMounted ? { opacity: 0, y: 20 } : false;
+  const fadeUpInitial = hasMounted ? { opacity: 0, y: 18 } : false;
+  const reflectionPreview = reflectionText.trim()
+    ? `${reflectionText.trim().slice(0, 120)}${reflectionText.trim().length > 120 ? '...' : ''}`
+    : 'Write one quick line about how the last reset felt. Notes stay on this device.';
+  const difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  const difficultyCompactLabel = difficulty === 'medium' ? 'Med' : difficultyLabel;
 
   const handleTabChange = (tab: Tab) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(50);
+      navigator.vibrate(35);
     }
     setActiveTab(tab);
     playTabSelect();
   };
 
-  const handleSelect = (mood: typeof MOODS[0]) => {
+  const handleSelect = (selectedMood: (typeof MOODS)[number]) => {
     playClick();
-    setMood(mood.id);
-    setAmbientParameters(mood.id, difficulty);
-    let activityToStart = mood.activity;
-    
-    if (mood.id === 'bored') {
+    setMood(selectedMood.id);
+    setAmbientParameters(selectedMood.id, difficulty);
+
+    let activityToStart = selectedMood.activity;
+    if (selectedMood.id === 'bored') {
       const boredActivities: Activity[] = ['color', 'memory', 'direction'];
       activityToStart = boredActivities[Math.floor(Math.random() * boredActivities.length)];
     }
-    
-    startActivity(activityToStart, mood.isCalm);
+
+    startActivity(activityToStart, selectedMood.isCalm);
   };
 
   const handleDirectActivity = (activity: Activity, isCalm: boolean) => {
@@ -121,19 +183,20 @@ export function HomeView() {
       setPlayingAudio('none');
       toggleAmbientDrift(false);
       toggleNatureFocus(false);
+      return;
+    }
+
+    setPlayingAudio(type);
+    if (type === 'ambient') {
+      toggleNatureFocus(false);
+      toggleAmbientDrift(true);
     } else {
-      setPlayingAudio(type);
-      if (type === 'ambient') {
-        toggleNatureFocus(false);
-        toggleAmbientDrift(true);
-      } else {
-        toggleAmbientDrift(false);
-        toggleNatureFocus(true);
-      }
+      toggleAmbientDrift(false);
+      toggleNatureFocus(true);
     }
   };
 
-  const handleReflectionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleReflectionChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setReflectionText(e.target.value);
     try {
       localStorage.setItem('mood_reset_reflection', e.target.value);
@@ -142,324 +205,578 @@ export function HomeView() {
     }
   };
 
+  const calmItems = LIBRARY_ITEMS.filter((item) => item.calm);
+  const focusItems = LIBRARY_ITEMS.filter((item) => !item.calm);
 
   return (
-    <div className="w-full min-h-screen flex ambient-bg text-foreground font-sans">
-      {/* Top Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-8 py-6 font-display tracking-tight bg-background/80 backdrop-blur-md">
-        <div className="text-2xl font-bold">MoodDetox</div>
-        {!isMobile && (
-          <div className="flex gap-8 items-center">
-            <button onClick={() => handleTabChange('sanctuary')} className={`${activeTab === 'sanctuary' ? 'text-primary font-bold' : 'text-muted'} hover:opacity-80 transition-opacity`}>Sanctuary</button>
-            <button onClick={() => handleTabChange('library')} className={`${activeTab === 'library' ? 'text-primary font-bold' : 'text-muted'} hover:opacity-80 transition-opacity`}>Library</button>
-            <button onClick={() => handleTabChange('pulse')} className={`${activeTab === 'pulse' ? 'text-primary font-bold' : 'text-muted'} hover:opacity-80 transition-opacity`}>Pulse</button>
-            <button onClick={() => handleTabChange('reflect')} className={`${activeTab === 'reflect' ? 'text-primary font-bold' : 'text-muted'} hover:opacity-80 transition-opacity`}>Reflect</button>
-          </div>
-        )}
-        <div className="flex items-center gap-4 text-primary">
-          <Settings 
-            onClick={() => {
-              playClick();
-              setView('settings');
-            }}
-            className="w-6 h-6 cursor-pointer hover:opacity-80 transition-opacity" 
-          />
-          <User className="w-6 h-6 cursor-pointer hover:opacity-80 transition-opacity" />
-        </div>
-      </nav>
+    <div className="min-h-screen ambient-bg text-foreground">
+      <div className="relative isolate min-h-screen">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary/6 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute left-[-6rem] top-24 h-48 w-48 rounded-full bg-primary/8 blur-3xl" />
+        <div className="pointer-events-none absolute right-[-5rem] top-44 h-56 w-56 rounded-full bg-surface-hover/30 blur-3xl" />
 
-      {/* Main Content */}
-      <main className="flex-1 px-8 pt-32 pb-32 flex flex-col items-center min-h-screen">
-        <AnimatePresence mode="wait" initial={false}>
-          {activeTab === 'sanctuary' && (
-            <motion.div 
-              key="sanctuary"
-              initial={fadeUpInitial}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full flex flex-col items-center"
-            >
-              <div className="max-w-6xl w-full text-center space-y-4 mb-20">
-                <span className="text-muted font-sans text-sm uppercase tracking-[0.3em]">The Experience</span>
-                <h1 className="text-6xl md:text-8xl font-display font-extrabold tracking-tighter leading-tight">
-                  MoodDetox
-                </h1>
-                <p className="text-lg md:text-xl text-muted max-w-xl mx-auto opacity-70">
-                  Select your state for a 60-second reset. Your digital breath begins here.
-                </p>
+        <header className="sticky top-0 z-40 border-b border-border/40 bg-background/72 backdrop-blur-xl">
+          <ViewFrame className="py-2.5 sm:py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="section-kicker">Game shell</div>
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                  <h1 className="truncate text-xl font-display font-bold tracking-tight sm:text-2xl">MoodDetox</h1>
+                  {!isMobile ? <p className="hidden text-sm text-muted lg:block">Reset in under a minute.</p> : null}
+                </div>
               </div>
 
-              {/* Mood Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl">
-                {MOODS.map((mood, index) => {
-                  const Icon = mood.icon;
-                  const isStressed = mood.id === 'stressed';
-                  
-                  const colorMap = {
-                    tired: { bg: 'bg-orange-500/10', text: 'text-orange-500', buttonBg: 'bg-orange-500', buttonText: 'text-white' },
-                    stressed: { bg: 'bg-teal-500/10', text: 'text-teal-500', buttonBg: 'bg-teal-500', buttonText: 'text-white' },
-                    bored: { bg: 'bg-purple-500/10', text: 'text-purple-500', buttonBg: 'bg-purple-500', buttonText: 'text-white' },
-                  };
-                  const colors = colorMap[mood.id as keyof typeof colorMap];
+              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                {!isMobile ? (
+                  <>
+                    <StatChip label="Streak" value={`${streak}d`} icon={Flame} />
+                    <StatChip label="Sessions" value={totalSessions} icon={HeartPulse} />
+                  </>
+                ) : null}
+                <ShellButton
+                  aria-label="Open settings"
+                  size="icon"
+                  variant="secondary"
+                  className="max-sm:h-8 max-sm:w-8"
+                  onClick={() => {
+                    playClick();
+                    setView('settings');
+                  }}
+                >
+                  <Settings className="h-4 w-4" />
+                </ShellButton>
+              </div>
+            </div>
 
-                  return (
-                    <motion.div
-                      key={mood.id}
-                      initial={fadeUpInitial}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + index * 0.1 }}
-                      onClick={() => handleSelect(mood)}
-                      className={`group relative overflow-hidden rounded-3xl flex flex-col items-center justify-end p-10 cursor-pointer transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] bg-surface mood-glow-${mood.theme} ${isStressed ? 'h-[500px] md:-translate-y-6' : 'h-[450px]'}`}
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-surface-hover opacity-50`}></div>
-                      <div className={`absolute inset-0 inner-glow-${mood.theme} opacity-40`}></div>
-                      
-                      <div className="relative z-10 flex flex-col items-center text-center space-y-6">
-                        <div className={`w-24 h-24 rounded-full ${colors.bg} flex items-center justify-center ${colors.text} shadow-xl`}>
-                          <Icon className="w-10 h-10" />
+            {!isMobile ? (
+              <SegmentedControl
+                className="mt-3"
+                value={activeTab}
+                onChange={(next) => handleTabChange(next as Tab)}
+                options={HOME_TAB_OPTIONS.map((option) => ({ ...option }))}
+              />
+            ) : null}
+          </ViewFrame>
+        </header>
+
+        <main className="relative">
+          <ViewFrame className={cn('shell-page', isMobile && 'pb-24')}>
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === 'sanctuary' && (
+                <motion.section
+                  key="sanctuary"
+                  initial={fadeUpInitial}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-5"
+                >
+                  <ScreenHeader
+                    eyebrow="Quick reset"
+                    title="Choose your state"
+                    subtitle="Pick the mode that matches how you feel and jump into a short session without the extra chrome."
+                    actions={!isMobile ? <StatChip label="Difficulty" value={difficultyLabel} icon={Target} /> : null}
+                  />
+
+                  {isMobile ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
+                        <Flame className="h-3.5 w-3.5 shrink-0 text-primary/90" />
+                        <span className="shrink-0 text-sm font-display font-bold text-foreground">{`${streak}d`}</span>
+                        <span className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Streak</span>
+                      </div>
+                      <div className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/45 bg-background/40 px-3 py-2 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.85)]">
+                        <Target className="h-3.5 w-3.5 shrink-0 text-primary/90" />
+                        <span className="shrink-0 text-sm font-display font-bold text-foreground">{difficultyCompactLabel}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
+                    {MOODS.map((selectedMood, index) => {
+                      const Icon = selectedMood.icon;
+
+                      return (
+                        <motion.button
+                          key={selectedMood.id}
+                          type="button"
+                          initial={fadeUpInitial}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.08 + index * 0.06 }}
+                          onClick={() => handleSelect(selectedMood)}
+                          className={cn(
+                            'game-panel game-panel-raised group relative isolate flex min-h-[204px] min-w-0 flex-col justify-between overflow-hidden p-4 text-left transition-transform duration-300 hover:-translate-y-1 sm:min-h-[236px] sm:p-5 lg:min-h-[250px]',
+                            `mood-glow-${selectedMood.theme}`,
+                          )}
+                        >
+                          <div className={cn('pointer-events-none absolute inset-0 opacity-70', `inner-glow-${selectedMood.theme}`)} />
+                          <div
+                            className={cn(
+                              'pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-transparent to-transparent',
+                              selectedMood.id === 'tired' && 'from-orange-500/18',
+                              selectedMood.id === 'stressed' && 'from-teal-500/18',
+                              selectedMood.id === 'bored' && 'from-purple-500/18',
+                            )}
+                          />
+
+                          <div className="relative z-10 flex items-start justify-between gap-3">
+                            <span className={cn('rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em]', selectedMood.badgeClass)}>
+                              {selectedMood.meta}
+                            </span>
+                            <div className={cn('rounded-2xl border border-white/10 p-2.5 sm:p-3', selectedMood.toneClass)}>
+                              <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                            </div>
+                          </div>
+
+                          <div className="relative z-10 space-y-3">
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted">{selectedMood.label}</p>
+                              <h3 className={cn('text-xl font-display font-bold tracking-tight sm:text-2xl', selectedMood.toneClass)}>
+                                {selectedMood.headline}
+                              </h3>
+                            </div>
+                            <p className="max-w-xs text-[13px] leading-5 text-muted sm:text-sm sm:leading-6">{selectedMood.summary}</p>
+                          </div>
+
+                          <div className="relative z-10 flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                              {selectedMood.isCalm ? 'Calm mode' : 'Game mode'}
+                            </span>
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-2 self-start rounded-full px-3 py-2 text-sm font-bold shadow-lg sm:px-3.5',
+                                selectedMood.ctaClass,
+                              )}
+                            >
+                              Start
+                              <ArrowRight className="h-4 w-4" />
+                            </span>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {isMobile ? (
+                    <Panel tone="soft" padding="sm">
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <div className="section-kicker">Quick tools</div>
+                          <h3 className="text-lg font-display font-bold">Stay in flow</h3>
+                          <p className="text-sm text-muted">Check progress, swap ambience, or drop a note without breaking the game feel.</p>
                         </div>
-                        <div>
-                          <h2 className={`text-3xl font-display font-bold ${colors.text} mb-2`}>{mood.label}</h2>
-                          <p className="text-muted text-sm font-sans uppercase tracking-widest">{mood.subtitle}</p>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <StatChip label="Sessions" value={totalSessions} icon={HeartPulse} className="w-full justify-between" />
+                          <StatChip label="Difficulty" value={difficultyLabel} icon={Target} className="w-full justify-between" />
                         </div>
-                        <div className="pt-4">
-                          <button className={`${colors.buttonBg} ${colors.buttonText} px-8 py-3 rounded-full font-sans text-sm font-bold opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0`}>
-                            {mood.buttonText}
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTabChange('pulse')}
+                            className="flex items-center justify-between rounded-2xl border border-border/45 bg-background/35 px-3 py-3 text-left transition-colors hover:bg-surface-hover/35"
+                          >
+                            <div>
+                              <div className="text-sm font-display font-bold">Pulse</div>
+                              <div className="text-[11px] text-muted">Stats and streak</div>
+                            </div>
+                            <HeartPulse className="h-4 w-4 text-primary" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTabChange('reflect')}
+                            className="flex items-center justify-between rounded-2xl border border-border/45 bg-background/35 px-3 py-3 text-left transition-colors hover:bg-surface-hover/35"
+                          >
+                            <div>
+                              <div className="text-sm font-display font-bold">Journal</div>
+                              <div className="text-[11px] text-muted">One quick note</div>
+                            </div>
+                            <Sparkles className="h-4 w-4 text-primary" />
                           </button>
                         </div>
-                      </div>
 
-                      {isStressed && (
-                        <div className="absolute top-6 right-6">
-                          <span className={`${colors.bg} ${colors.text} px-4 py-1 rounded-full text-xs font-bold uppercase`}>Most Needed</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'ambient', title: 'Ambient', subtitle: 'Soft tones', icon: Music },
+                            { id: 'nature', title: 'Nature', subtitle: 'Wind blend', icon: Sun },
+                          ].map((item) => {
+                            const Icon = item.icon;
+                            const isPlaying = playingAudio === item.id;
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleAudioToggle(item.id as 'ambient' | 'nature')}
+                                className="rounded-2xl border border-border/45 bg-background/35 px-3 py-3 text-left transition-colors hover:bg-surface-hover/35"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="space-y-1">
+                                    <div className="text-sm font-display font-bold">{item.title}</div>
+                                    <div className="text-[11px] text-muted">{isPlaying ? 'Now playing' : item.subtitle}</div>
+                                  </div>
+                                  <div className="rounded-2xl bg-surface p-2 text-primary">
+                                    <Icon className="h-4 w-4" />
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
+
+                        <div className="rounded-2xl border border-border/45 bg-background/35 p-3">
+                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Latest note</div>
+                          <p className="text-sm leading-5 text-muted">{reflectionPreview}</p>
+                        </div>
+                      </div>
+                    </Panel>
+                  ) : (
+                    <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr_0.9fr]">
+                      <Panel tone="soft" padding="sm" className="h-full">
+                        <div className="flex h-full flex-col gap-4">
+                          <div className="space-y-2">
+                            <div className="section-kicker">Daily pulse</div>
+                            <h3 className="text-lg font-display font-bold">Keep the streak alive</h3>
+                            <p className="text-sm text-muted">Short sessions work best when the shell stays out of the way and you return often.</p>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <StatChip label="Current streak" value={`${streak} day${streak === 1 ? '' : 's'}`} icon={Flame} className="w-full justify-between" />
+                            <StatChip label="Total resets" value={totalSessions} icon={HeartPulse} className="w-full justify-between" />
+                          </div>
+                          <ShellButton size="sm" variant="secondary" onClick={() => handleTabChange('pulse')} className="self-start">
+                            Open Pulse
+                          </ShellButton>
+                        </div>
+                      </Panel>
+
+                      <Panel tone="soft" padding="sm" className="h-full">
+                        <div className="flex h-full flex-col gap-3">
+                          <div className="space-y-2">
+                            <div className="section-kicker">Soundscape</div>
+                            <h3 className="text-lg font-display font-bold">Play with less clutter</h3>
+                            <p className="text-sm text-muted">Keep one ambience loop running in the background while you navigate the shell.</p>
+                          </div>
+
+                          {[
+                            { id: 'ambient', title: 'Ambient Drift', subtitle: 'Soft tones for calm focus', icon: Music },
+                            { id: 'nature', title: 'Nature Focus', subtitle: 'Wind and brown noise blend', icon: Sun },
+                          ].map((item) => {
+                            const Icon = item.icon;
+                            const isPlaying = playingAudio === item.id;
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleAudioToggle(item.id as 'ambient' | 'nature')}
+                                className="flex items-center justify-between gap-3 rounded-2xl border border-border/45 bg-background/35 px-3 py-2.5 text-left transition-colors hover:bg-surface-hover/35"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="rounded-2xl bg-surface p-2 text-primary">
+                                    <Icon className="h-4 w-4" />
+                                  </div>
+                                  <div>
+                                    <div className="font-display text-sm font-bold">{item.title}</div>
+                                    <div className="text-xs text-muted">{isPlaying ? 'Now playing' : item.subtitle}</div>
+                                  </div>
+                                </div>
+                                {isPlaying ? <PauseCircle className="h-5 w-5 text-primary" /> : <PlayCircle className="h-5 w-5 text-muted" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Panel>
+
+                      <Panel tone="soft" padding="sm" className="h-full">
+                        <div className="flex h-full flex-col gap-4">
+                          <div className="space-y-2">
+                            <div className="section-kicker">Reflect</div>
+                            <h3 className="text-lg font-display font-bold">Keep one quick note</h3>
+                            <p className="text-sm text-muted">No feed, no clutter. Just a short checkpoint between resets.</p>
+                          </div>
+                          <div className="min-h-[96px] rounded-2xl border border-border/45 bg-background/35 p-3 text-sm leading-6 text-muted">
+                            {reflectionPreview}
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Saved locally</span>
+                            <ShellButton size="sm" variant="secondary" onClick={() => handleTabChange('reflect')}>
+                              Open journal
+                            </ShellButton>
+                          </div>
+                        </div>
+                      </Panel>
+                    </div>
+                  )}
+                </motion.section>
+              )}
+
+              {activeTab === 'library' && (
+                <motion.section
+                  key="library"
+                  initial={fadeUpInitial}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-5"
+                >
+                  <ScreenHeader
+                    eyebrow="Game menu"
+                    title="Library"
+                    subtitle="All reset activities in one place, with difficulty and local multiplayer close at hand."
+                  />
+
+                  <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                    <Panel tone="soft" padding="sm">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="section-kicker">Session difficulty</div>
+                          <h3 className="text-lg font-display font-bold">Keep your challenge level steady</h3>
+                        </div>
+                        <SegmentedControl
+                          compact
+                          value={difficulty}
+                          onChange={(next) => {
+                            playClick();
+                            setDifficulty(next as 'easy' | 'medium' | 'hard');
+                            setAmbientParameters(mood, next as 'easy' | 'medium' | 'hard');
+                          }}
+                          options={DIFFICULTY_OPTIONS.map((option) => ({ ...option }))}
+                        />
+                      </div>
+                    </Panel>
+
+                    <Panel tone="soft" padding="sm">
+                      <div className="flex h-full flex-col justify-between gap-4">
+                        <div className="space-y-2">
+                          <div className="section-kicker">Local multiplayer</div>
+                          <h3 className="text-lg font-display font-bold">Play side-by-side with a friend</h3>
+                          <p className="text-sm text-muted">Host a short head-to-head match from the same browser session flow.</p>
+                        </div>
+                        <ShellButton
+                          variant="primary"
+                          onClick={() => {
+                            playClick();
+                            setView('multiplayer_lobby');
+                          }}
+                          className="self-start"
+                        >
+                          <Users className="h-4 w-4" />
+                          Open lobby
+                        </ShellButton>
+                      </div>
+                    </Panel>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="section-kicker">Calm</div>
+                      <h3 className="text-lg font-display font-bold">Quiet modes</h3>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {calmItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleDirectActivity(item.id, item.calm)}
+                            className="game-panel group flex items-start gap-4 p-3.5 text-left transition-transform duration-200 hover:-translate-y-0.5 sm:p-4"
+                          >
+                            <div className="rounded-2xl bg-teal-500/12 p-3 text-teal-500">
+                              <Icon className="h-6 w-6" />
+                            </div>
+                            <div className="min-w-0 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-display text-lg font-bold">{item.name}</h4>
+                                <span className="rounded-full bg-surface-hover/50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
+                                  {item.duration}
+                                </span>
+                              </div>
+                              <p className="text-sm leading-6 text-muted">{item.desc}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="section-kicker">Games</div>
+                      <h3 className="text-lg font-display font-bold">Fast focus rounds</h3>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {focusItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleDirectActivity(item.id, item.calm)}
+                            className="game-panel group flex items-start gap-4 p-3.5 text-left transition-transform duration-200 hover:-translate-y-0.5 sm:p-4"
+                          >
+                            <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+                              <Icon className="h-6 w-6" />
+                            </div>
+                            <div className="min-w-0 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-display text-lg font-bold">{item.name}</h4>
+                                <span className="rounded-full bg-surface-hover/50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
+                                  {item.category}
+                                </span>
+                                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{item.duration}</span>
+                              </div>
+                              <p className="text-sm leading-6 text-muted">{item.desc}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </motion.section>
+              )}
+
+              {activeTab === 'pulse' && (
+                <motion.section
+                  key="pulse"
+                  initial={fadeUpInitial}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-5"
+                >
+                  <ScreenHeader
+                    eyebrow="Progress"
+                    title="Your Pulse"
+                    subtitle="A compact read on how often you reset, how hard you play, and where to go next."
+                  />
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Panel tone="raised" className="text-center">
+                      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/12 text-orange-500">
+                        <Flame className="h-7 w-7" />
+                      </div>
+                      <div className="text-4xl font-display font-bold">{streak}</div>
+                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-muted">Day streak</div>
+                    </Panel>
+
+                    <Panel tone="raised" className="text-center">
+                      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <HeartPulse className="h-7 w-7" />
+                      </div>
+                      <div className="text-4xl font-display font-bold">{totalSessions}</div>
+                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-muted">Total resets</div>
+                    </Panel>
+
+                    <Panel tone="raised" className="text-center">
+                      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/12 text-teal-500">
+                        <Target className="h-7 w-7" />
+                      </div>
+                      <div className="text-4xl font-display font-bold capitalize">{difficulty}</div>
+                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-muted">Current difficulty</div>
+                    </Panel>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                    <Panel tone="soft">
+                      <div className="space-y-3">
+                        <div className="section-kicker">What it means</div>
+                        <h3 className="text-lg font-display font-bold">
+                          {streak > 0 ? `You are on a ${streak}-day run.` : 'You are ready to start a new streak.'}
+                        </h3>
+                        <p className="text-sm leading-6 text-muted">
+                          Frequent short rounds matter more than long sessions. Keep the shell simple, return often, and let the score build naturally.
+                        </p>
+                      </div>
+                    </Panel>
+
+                    <Panel tone="soft">
+                      <div className="flex h-full flex-col justify-between gap-4">
+                        <div className="space-y-2">
+                          <div className="section-kicker">Next move</div>
+                          <h3 className="text-lg font-display font-bold">Jump back into a quick reset</h3>
+                          <p className="text-sm text-muted">Return to the mode picker or open the full activity library.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <ShellButton variant="primary" onClick={() => handleTabChange('sanctuary')}>
+                            Open Sanctuary
+                          </ShellButton>
+                          <ShellButton variant="secondary" onClick={() => handleTabChange('library')}>
+                            Open Library
+                          </ShellButton>
+                        </div>
+                      </div>
+                    </Panel>
+                  </div>
+                </motion.section>
+              )}
+
+              {activeTab === 'reflect' && (
+                <motion.section
+                  key="reflect"
+                  initial={fadeUpInitial}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-5"
+                >
+                  <ScreenHeader
+                    eyebrow="Journal"
+                    title="Reflect"
+                    subtitle="A quiet note field for how the last round felt. Nothing public, nothing busy."
+                    actions={<StatChip label="Storage" value="Local only" icon={Sparkles} />}
+                  />
+
+                  <Panel tone="raised" padding="lg">
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-border/45 bg-background/35 p-4 text-sm text-muted">
+                        Short notes help you track what state you came in with and which mode helped most.
+                      </div>
+                      <textarea
+                        value={reflectionText}
+                        onChange={handleReflectionChange}
+                        placeholder="What changed after this reset?"
+                        className="min-h-[320px] w-full resize-none rounded-[1.3rem] border border-border/45 bg-background/35 p-4 text-base text-foreground outline-none transition-colors placeholder:text-muted/60 focus:border-primary/55"
+                      />
+                    </div>
+                  </Panel>
+                </motion.section>
+              )}
+            </AnimatePresence>
+          </ViewFrame>
+        </main>
+
+        {isMobile ? (
+          <div className="pointer-events-none fixed inset-x-0 bottom-1.5 z-50 px-2.5">
+            <div className="pointer-events-auto mx-auto w-full max-w-sm rounded-[1.2rem] border border-border/45 bg-background/88 p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.85)] backdrop-blur-xl">
+              <div className="grid grid-cols-4 gap-0.5">
+                {HOME_TAB_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = activeTab === option.id;
+                  const mobileLabel =
+                    option.id === 'library' ? 'Games' : option.id === 'pulse' ? 'Stats' : option.id === 'reflect' ? 'Notes' : option.shortLabel;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => handleTabChange(option.id)}
+                      className={cn(
+                        'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.95rem] px-1 py-1.5 text-[8px] font-bold uppercase tracking-[0.1em] transition-colors',
+                        isActive ? 'bg-primary text-primary-fg' : 'text-muted',
                       )}
-                    </motion.div>
+                    >
+                      <Icon className="h-3 w-3 shrink-0" />
+                      <span className="truncate leading-none">{mobileLabel}</span>
+                    </button>
                   );
                 })}
               </div>
-
-              {/* Bottom Grid */}
-              <div className="mt-24 grid grid-cols-1 md:grid-cols-4 gap-8 w-full max-w-6xl">
-                {/* Streak Card */}
-                <div className="col-span-1 md:col-span-2 bg-surface rounded-2xl p-12 relative overflow-hidden group">
-                  <div className="relative z-10 space-y-4">
-                    <span className="text-muted font-sans text-xs uppercase tracking-widest">Daily Insight</span>
-                    <h4 className="text-2xl font-display font-bold">
-                      {streak > 0 
-                        ? `You've found calm ${streak} day${streak === 1 ? '' : 's'} in a row.`
-                        : "Start your journey to emotional resilience today."}
-                    </h4>
-                    <p className="text-muted font-sans">Keep the momentum going. Consistency is the foundation of emotional resilience.</p>
-                    <button onClick={() => handleTabChange('pulse')} className="flex items-center text-primary font-bold font-sans text-sm group-hover:opacity-80 transition-opacity">
-                      View detailed stats
-                      <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-                    </button>
-                  </div>
-                  <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-colors"></div>
-                </div>
-
-                {/* Audio Cards */}
-                <div className="col-span-1 md:col-span-2 flex flex-col gap-4">
-                  <div className="flex-1 bg-surface rounded-2xl p-8 flex items-center justify-between border-b-4 border-surface-hover">
-                    <div className="flex items-center gap-6">
-                      <div className="w-12 h-12 bg-surface-hover rounded-full flex items-center justify-center">
-                        <Music className="w-5 h-5 text-muted" />
-                      </div>
-                      <div>
-                        <h5 className="font-display font-bold">Ambient Drift</h5>
-                        <p className="text-xs text-muted font-sans">{playingAudio === 'ambient' ? 'Now playing in your Sanctuary' : 'Binaural relaxation'}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => handleAudioToggle('ambient')} className="hover:scale-110 transition-transform">
-                      {playingAudio === 'ambient' ? <PauseCircle className="w-8 h-8 text-primary" /> : <PlayCircle className="w-8 h-8 text-muted" />}
-                    </button>
-                  </div>
-                  <div className="flex-1 bg-surface rounded-2xl p-8 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className="w-12 h-12 bg-surface-hover rounded-full flex items-center justify-center">
-                        <Sun className="w-5 h-5 text-muted" />
-                      </div>
-                      <div>
-                        <h5 className="font-display font-bold">Nature Focus</h5>
-                        <p className="text-xs text-muted font-sans">{playingAudio === 'nature' ? 'Now playing in your Sanctuary' : 'Brown noise & wind'}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => handleAudioToggle('nature')} className="hover:scale-110 transition-transform">
-                      {playingAudio === 'nature' ? <PauseCircle className="w-8 h-8 text-primary" /> : <PlayCircle className="w-8 h-8 text-muted" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'library' && (
-            <motion.div 
-              key="library"
-              initial={fadeUpInitial}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-4xl"
-            >
-              <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                  <h2 className="text-4xl font-display font-bold mb-4">Experience Library</h2>
-                  <p className="text-muted">Direct access to all micro-games and calm activities.</p>
-                </div>
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2 bg-surface p-1 rounded-full">
-                    {(['easy', 'medium', 'hard'] as const).map(diff => (
-                      <button
-                        key={diff}
-                        onClick={() => {
-                          playClick();
-                          setDifficulty(diff);
-                          setAmbientParameters(mood, diff);
-                        }}
-                        className={`px-4 py-2 rounded-full text-sm font-bold capitalize transition-colors ${difficulty === diff ? 'bg-primary text-primary-fg' : 'text-muted hover:text-foreground'}`}
-                      >
-                        {diff}
-                      </button>
-                    ))}
-                  </div>
-                  <button 
-                    onClick={() => {
-                      playClick();
-                      setView('multiplayer_lobby');
-                    }}
-                    className="px-6 py-3 bg-primary text-primary-fg rounded-full font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap"
-                  >
-                    <Users className="w-5 h-5" />
-                    Local Multiplayer
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { id: 'particles', name: 'Particle Breathing', icon: Wind, calm: true, desc: '60s guided breathing with interactive particles.' },
-                  { id: 'reaction', name: 'Reaction Tap', icon: Target, calm: false, desc: '30s fast-paced target tapping to wake up.' },
-                  { id: 'color', name: 'Color Match', icon: Brain, calm: false, desc: '30s cognitive test based on the Stroop effect.' },
-                  { id: 'memory', name: 'Memory Flash', icon: ActivityIcon, calm: false, desc: '30s sequence memory game with musical tones.' },
-                  { id: 'direction', name: 'Direction Dash', icon: Zap, calm: false, desc: '30s cognitive reaction test with opposites.' },
-                  { id: 'rulebreaker', name: 'Rule Breaker', icon: Sparkles, calm: false, desc: '30s context-switching challenge. Watch the rule!' },
-                  { id: 'mirrorlogic', name: 'Mirror Logic', icon: Moon, calm: false, desc: '30s spatial inversion challenge. Tap the reflection!' },
-                  { id: 'simonparadox', name: 'Simon Paradox', icon: Brain, calm: false, desc: '30s inhibitory control challenge. Listen to Simon!' },
-                ].map(act => (
-                  <div key={act.id} onClick={() => handleDirectActivity(act.id as Activity, act.calm)} className="bg-surface p-6 rounded-2xl cursor-pointer hover:bg-surface-hover transition-colors flex items-center gap-6 group">
-                    <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                      <act.icon className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="font-display font-bold text-lg">{act.name}</h3>
-                      <p className="text-sm text-muted">{act.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'pulse' && (
-            <motion.div 
-              key="pulse"
-              initial={fadeUpInitial}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-4xl"
-            >
-              <div className="mb-12">
-                <h2 className="text-4xl font-display font-bold mb-4">Your Pulse</h2>
-                <p className="text-muted">Track your emotional resilience journey.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-surface p-10 rounded-3xl flex flex-col items-center justify-center text-center">
-                  <div className="w-24 h-24 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center mb-6">
-                    <Flame className="w-12 h-12" />
-                  </div>
-                  <div className="text-6xl font-display font-bold mb-2">{streak}</div>
-                  <div className="text-muted uppercase tracking-widest text-sm">Current Streak (Days)</div>
-                </div>
-                <div className="bg-surface p-10 rounded-3xl flex flex-col items-center justify-center text-center">
-                  <div className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6">
-                    <HeartPulse className="w-12 h-12" />
-                  </div>
-                  <div className="text-6xl font-display font-bold mb-2">{totalSessions}</div>
-                  <div className="text-muted uppercase tracking-widest text-sm">Total Resets</div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'reflect' && (
-            <motion.div 
-              key="reflect"
-              initial={fadeUpInitial}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-4xl flex flex-col h-[60vh]"
-            >
-              <div className="mb-8">
-                <h2 className="text-4xl font-display font-bold mb-4">Digital Journal</h2>
-                <p className="text-muted">A private space to drop your thoughts. Saved locally.</p>
-              </div>
-              <textarea
-                value={reflectionText}
-                onChange={handleReflectionChange}
-                placeholder="What's on your mind right now?..."
-                className="flex-1 w-full bg-surface border-none rounded-3xl p-8 text-lg resize-none focus:ring-2 focus:ring-primary outline-none text-foreground placeholder:text-muted/50"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Footer */}
-        <footer className="mt-32 w-full max-w-6xl flex flex-col md:flex-row justify-between items-center text-muted font-sans text-xs uppercase tracking-[0.2em]">
-          <div className="mb-4 md:mb-0">MoodDetox © 2026</div>
-          <div className="flex gap-8">
-            <a className="hover:text-primary transition-colors" href="#">Privacy</a>
-            <a className="hover:text-primary transition-colors" href="#">OS Settings</a>
-            <a className="hover:text-primary transition-colors" href="#">Community</a>
+            </div>
           </div>
-        </footer>
-      </main>
-
-      {/* FAB */}
-      {!isMobile && (
-        <button 
-          onClick={() => handleTabChange('reflect')}
-          className="fixed bottom-10 right-10 w-16 h-16 bg-primary text-primary-fg rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95 group z-50"
-        >
-          <Plus className="w-8 h-8" />
-          <span className="absolute right-20 bg-surface text-foreground px-4 py-2 rounded-lg font-sans text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest shadow-lg">
-            New Reflection
-          </span>
-        </button>
-      )}
-
-      {/* Mobile Nav */}
-      {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-lg flex justify-around items-center p-6 z-50 border-t border-surface">
-          <motion.button whileTap={{ scale: 0.85 }} onClick={() => handleTabChange('sanctuary')} className={`flex flex-col items-center gap-1 cursor-pointer ${activeTab === 'sanctuary' ? 'text-primary font-bold' : 'text-muted'}`}>
-            <Leaf className="w-5 h-5" />
-            <span className="text-[10px] font-display uppercase tracking-tighter">Sanctuary</span>
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.85 }} onClick={() => handleTabChange('library')} className={`flex flex-col items-center gap-1 cursor-pointer ${activeTab === 'library' ? 'text-primary font-bold' : 'text-muted'}`}>
-            <Gamepad2 className="w-5 h-5" />
-            <span className="text-[10px] font-display uppercase tracking-tighter">Library</span>
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.85 }} onClick={() => handleTabChange('pulse')} className={`flex flex-col items-center gap-1 cursor-pointer ${activeTab === 'pulse' ? 'text-primary font-bold' : 'text-muted'}`}>
-            <HeartPulse className="w-5 h-5" />
-            <span className="text-[10px] font-display uppercase tracking-tighter">Pulse</span>
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.85 }} onClick={() => handleTabChange('reflect')} className={`flex flex-col items-center gap-1 cursor-pointer ${activeTab === 'reflect' ? 'text-primary font-bold' : 'text-muted'}`}>
-            <Sparkles className="w-5 h-5" />
-            <span className="text-[10px] font-display uppercase tracking-tighter">Reflect</span>
-          </motion.button>
-        </div>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }
-
-
