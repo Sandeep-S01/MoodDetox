@@ -19,7 +19,7 @@ export type SessionEntryIntent =
   | { type: 'challenge'; challenge: Challenge };
 
 export function resolveSessionEntry(search: string): SessionEntryIntent {
-  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const params = new URLSearchParams(search);
   const joinId = params.get('join')?.trim();
 
   if (joinId) {

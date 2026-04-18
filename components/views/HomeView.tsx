@@ -169,15 +169,20 @@ export function HomeView() {
       return;
     }
 
-    const saveTimer = window.setTimeout(() => {
+    const persist = () => {
       try {
         localStorage.setItem('mood_reset_reflection', reflectionText);
       } catch (err) {
         console.warn('Failed to save reflection to localStorage:', err);
       }
-    }, 150);
+    };
 
-    return () => window.clearTimeout(saveTimer);
+    const saveTimer = window.setTimeout(persist, 150);
+
+    return () => {
+      window.clearTimeout(saveTimer);
+      persist();
+    };
   }, [reflectionText]);
 
   const fadeUpInitial = hasMounted ? { opacity: 0, y: 18 } : false;

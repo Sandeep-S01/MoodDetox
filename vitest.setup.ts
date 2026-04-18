@@ -82,16 +82,32 @@ beforeEach(() => {
 
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes('prefers-reduced-motion') ? false : window.innerWidth < 768,
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+    value: vi.fn().mockImplementation((query: string) => {
+      const maxWidth = query.match(/\(\s*max-width:\s*(\d+)px\s*\)/);
+      const minWidth = query.match(/\(\s*min-width:\s*(\d+)px\s*\)/);
+
+      let matches = false;
+      if (query.includes('prefers-reduced-motion')) {
+        matches = false;
+      } else if (query.includes('pointer: coarse')) {
+        matches = window.innerWidth < 768;
+      } else if (maxWidth) {
+        matches = window.innerWidth <= Number(maxWidth[1]);
+      } else if (minWidth) {
+        matches = window.innerWidth >= Number(minWidth[1]);
+      }
+
+      return {
+        matches,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      };
+    }),
   });
 
   Object.defineProperty(window.navigator, 'vibrate', {

@@ -83,7 +83,7 @@ export function MultiplayerLobbyView() {
 
   const joinUrl = typeof window !== 'undefined' && peerId ? `${window.location.origin}${window.location.pathname}?join=${peerId}` : '';
   const rawLobbyCode = peerId ? peerId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() : '';
-  const lobbyCode = rawLobbyCode ? rawLobbyCode.match(/.{1,4}/g)?.join('-') ?? rawLobbyCode : '----';
+  const lobbyCode = rawLobbyCode ? rawLobbyCode.replace(/(.{4})(?=.)/g, '$1-') : '----';
   const copyLabel = copyState === 'copied' ? 'Invite copied' : copyState === 'error' ? 'Copy failed' : 'Copy invite link';
 
   const handleCopyInviteLink = async () => {

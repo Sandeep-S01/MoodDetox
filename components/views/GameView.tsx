@@ -180,9 +180,9 @@ export function GameView() {
         <div className="hud-strip grid w-full max-w-3xl grid-cols-[minmax(66px,auto)_1fr_minmax(66px,auto)] items-center gap-2 px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2">
             {isMultiplayer ? (
-              <div className="rounded-2xl bg-background/35 px-2 py-1.5 sm:px-3 sm:py-2">
+              <div className="rounded-2xl bg-background/35 px-2 py-1.5 sm:px-3 sm:py-2" aria-label={`Friend score ${opponentScore}`}>
                 <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-[10px] sm:tracking-[0.22em]">
-                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <Users className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                   {!isMobile ? 'Friend' : null}
                 </div>
                 <motion.div
