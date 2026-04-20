@@ -20,11 +20,34 @@ export function CalmView() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
+    const endTime = performance.now() + CALM_DURATION * 1000;
+    let lastShown = CALM_DURATION;
 
-    return () => window.clearInterval(timer);
+    const tick = () => {
+      const remainingMs = Math.max(0, endTime - performance.now());
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      if (remainingSec !== lastShown) {
+        lastShown = remainingSec;
+        setTimeLeft(remainingSec);
+      }
+    };
+
+    const interval = window.setInterval(tick, 250);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        tick();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      window.clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
   }, []);
 
   useEffect(() => {

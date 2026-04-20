@@ -90,31 +90,50 @@ export function GameView() {
   useEffect(() => {
     if (showCountdown) return;
 
-    if (timeLeft <= 0) {
-      if (hasFinishedRef.current) {
-        return;
-      }
+    const endTime = performance.now() + GAME_DURATION * 1000;
+    let lastShown = GAME_DURATION;
 
-      hasFinishedRef.current = true;
-
-      if (isMultiplayer) {
-        finishMultiplayerMatch(score);
-      }
-      endActivity(score, 'Session Complete');
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1;
+    const tick = () => {
+      const remainingMs = Math.max(0, endTime - performance.now());
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      if (remainingSec !== lastShown) {
+        lastShown = remainingSec;
+        setTimeLeft(remainingSec);
         if (typeof window !== 'undefined' && window.navigator.vibrate) {
           window.navigator.vibrate(10);
         }
-        return next;
-      });
-    }, 1000);
+      }
+    };
 
-    return () => clearInterval(timer);
+    const interval = window.setInterval(tick, 250);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        tick();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      window.clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
+  }, [showCountdown]);
+
+  useEffect(() => {
+    if (showCountdown || timeLeft > 0 || hasFinishedRef.current) {
+      return;
+    }
+
+    hasFinishedRef.current = true;
+
+    if (isMultiplayer) {
+      finishMultiplayerMatch(score);
+    }
+    endActivity(score, 'Session Complete');
   }, [endActivity, isMultiplayer, score, showCountdown, timeLeft]);
 
   useEffect(() => {
