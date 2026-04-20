@@ -1,4 +1,5 @@
 import { useMoodStore, type Activity, type Difficulty } from '@/store/useMoodStore';
+import { createScoreThrottle } from '@/lib/score-throttle';
 import type { DataConnection, Peer as PeerType } from 'peerjs';
 
 type MultiplayerActivity = Extract<Activity, 'reaction' | 'color' | 'direction'>;
@@ -33,6 +34,7 @@ const MULTIPLAYER_ACTIVITIES = new Set<MultiplayerActivity>(['reaction', 'color'
 const DIFFICULTIES = new Set<Difficulty>(['easy', 'medium', 'hard']);
 const CONNECTION_OPEN_TIMEOUT_MS = 15000;
 const PEER_READY_TIMEOUT_MS = 10000;
+const SCORE_SEND_INTERVAL_MS = 100;
 
 let peer: PeerType | null = null;
 let connection: DataConnection | null = null;
@@ -52,6 +54,7 @@ const isMatchId = (value: unknown): value is string => typeof value === 'string'
 const clearActiveMatch = () => {
   activeMatchId = null;
   handledRemoteEndMatchId = null;
+  scoreThrottle.cancel();
 };
 
 const handleConnectionLoss = (message: string) => {
@@ -91,6 +94,14 @@ const sendRawMessage = (message: MultiplayerMessage) => {
   }
   return false;
 };
+
+const scoreThrottle = createScoreThrottle({
+  intervalMs: SCORE_SEND_INTERVAL_MS,
+  send: (score: number) => {
+    if (!activeMatchId) return;
+    sendRawMessage({ type: 'SCORE_UPDATE', score, matchId: activeMatchId });
+  },
+});
 
 const parseMessage = (data: unknown): MultiplayerMessage | null => {
   if (!isObject(data) || typeof data.type !== 'string') {
@@ -354,7 +365,8 @@ export const sendMultiplayerScore = (score: number) => {
     return false;
   }
 
-  return sendRawMessage({ type: 'SCORE_UPDATE', score, matchId: activeMatchId });
+  scoreThrottle.invoke(score);
+  return true;
 };
 
 export const finishMultiplayerMatch = (score: number) => {
@@ -362,6 +374,7 @@ export const finishMultiplayerMatch = (score: number) => {
     return false;
   }
 
+  scoreThrottle.cancel();
   const matchId = activeMatchId;
   activeMatchId = null;
   handledRemoteEndMatchId = matchId;
