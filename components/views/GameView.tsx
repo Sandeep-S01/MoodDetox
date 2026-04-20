@@ -90,31 +90,27 @@ export function GameView() {
   useEffect(() => {
     if (showCountdown) return;
 
-    if (timeLeft <= 0) {
-      if (hasFinishedRef.current) {
-        return;
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+      if (typeof window !== 'undefined' && window.navigator.vibrate) {
+        window.navigator.vibrate(10);
       }
+    }, 1000);
 
-      hasFinishedRef.current = true;
+    return () => window.clearInterval(timer);
+  }, [showCountdown]);
 
-      if (isMultiplayer) {
-        finishMultiplayerMatch(score);
-      }
-      endActivity(score, 'Session Complete');
+  useEffect(() => {
+    if (showCountdown || timeLeft > 0 || hasFinishedRef.current) {
       return;
     }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1;
-        if (typeof window !== 'undefined' && window.navigator.vibrate) {
-          window.navigator.vibrate(10);
-        }
-        return next;
-      });
-    }, 1000);
+    hasFinishedRef.current = true;
 
-    return () => clearInterval(timer);
+    if (isMultiplayer) {
+      finishMultiplayerMatch(score);
+    }
+    endActivity(score, 'Session Complete');
   }, [endActivity, isMultiplayer, score, showCountdown, timeLeft]);
 
   useEffect(() => {
