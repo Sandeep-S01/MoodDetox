@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Manrope, Plus_Jakarta_Sans } from 'next/font/google';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ToastContainer } from '@/components/ui/Toast';
+import { TelemetryBoundary } from '@/components/TelemetryBoundary';
 import './globals.css';
 
 const manrope = Manrope({
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${manrope.variable} ${plusJakartaSans.variable}`}>
       <body className="font-sans bg-background text-foreground antialiased selection:bg-surface transition-colors duration-1000" suppressHydrationWarning>
         <ThemeProvider>
+          <TelemetryBoundary />
           {children}
           <ToastContainer />
         </ThemeProvider>

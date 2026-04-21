@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useMoodStore } from '@/store/useMoodStore';
+import { captureError } from '@/lib/telemetry';
 
 export default function Error({
   error,
@@ -11,9 +12,14 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [eventId, setEventId] = useState<string | null>(null);
+
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Unhandled application error:', error);
+    const event = captureError(error, {
+      source: 'app/error.tsx',
+      digest: error.digest,
+    });
+    setEventId(event.id);
     useMoodStore.getState().addToast(error.message || 'An unexpected error occurred', 'error');
   }, [error]);
 
@@ -24,9 +30,14 @@ export default function Error({
           <AlertTriangle className="w-10 h-10" />
         </div>
         <h2 className="text-2xl font-display font-bold mb-4">Something went wrong!</h2>
-        <p className="text-muted mb-8 text-sm">
+        <p className="text-muted mb-6 text-sm">
           {error.message || 'An unexpected error occurred while running the application.'}
         </p>
+        {eventId ? (
+          <p className="text-muted/70 mb-6 text-[11px] font-mono">
+            Reference: <span className="text-foreground/80">{eventId}</span>
+          </p>
+        ) : null}
         <button
           onClick={() => {
             // Attempt to recover by trying to re-render the segment

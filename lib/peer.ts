@@ -1,4 +1,5 @@
 import { useMoodStore, type Activity, type Difficulty } from '@/store/useMoodStore';
+import { captureError } from '@/lib/telemetry';
 import type { DataConnection, Peer as PeerType } from 'peerjs';
 
 type MultiplayerActivity = Extract<Activity, 'reaction' | 'color' | 'direction'>;
@@ -212,7 +213,7 @@ const attachConnection = (conn: DataConnection, role: 'host' | 'guest') => {
 
   conn.on('error', (err) => {
     clearOpenTimeout();
-    console.error(`${role} connection error:`, err);
+    captureError(err, { source: 'peer.connection.error', role });
     handleConnectionLoss(`Connection error: ${err.message || 'Unknown error'}`);
   });
 
@@ -265,7 +266,7 @@ export const initPeer = async () => {
     });
 
     peer.on('error', (err: { type: string; message?: string }) => {
-      console.error('PeerJS error:', err.type, err);
+      captureError(err.message ?? err.type, { source: 'peer.signaling.error', type: err.type });
 
       if (err.type === 'peer-unavailable') {
         handleConnectionLoss('Could not find the host. They may have disconnected.');
@@ -301,7 +302,7 @@ export const initPeer = async () => {
       }
     });
   } catch (err: unknown) {
-    console.error('Failed to initialize PeerJS:', err);
+    captureError(err, { source: 'peer.initPeer' });
     const message = err instanceof Error ? err.message : 'Unknown error';
     useMoodStore.getState().addToast(`Failed to start multiplayer: ${message}`, 'error');
   }
@@ -332,7 +333,7 @@ export const joinGame = async (hostId: string) => {
     const nextConnection = readyPeer.connect(trimmedHostId, { reliable: true });
     attachConnection(nextConnection, 'guest');
   } catch (err) {
-    console.error('Failed to prepare guest peer:', err);
+    captureError(err, { source: 'peer.joinGame' });
     handleConnectionLoss('Connection timed out. Please try again.');
   }
 };
