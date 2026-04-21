@@ -1,4 +1,5 @@
 import { useMoodStore, type Activity, type Difficulty } from '@/store/useMoodStore';
+import { computeBackoffDelay, shouldGiveUp, type BackoffOptions } from '@/lib/reconnect-backoff';
 import type { DataConnection, Peer as PeerType } from 'peerjs';
 
 type MultiplayerActivity = Extract<Activity, 'reaction' | 'color' | 'direction'>;
@@ -34,11 +35,20 @@ const DIFFICULTIES = new Set<Difficulty>(['easy', 'medium', 'hard']);
 const CONNECTION_OPEN_TIMEOUT_MS = 15000;
 const PEER_READY_TIMEOUT_MS = 10000;
 
+const RECONNECT_BACKOFF: BackoffOptions = {
+  initialDelayMs: 1000,
+  maxDelayMs: 15000,
+  factor: 2,
+  maxAttempts: 5,
+};
+
 let peer: PeerType | null = null;
 let connection: DataConnection | null = null;
 let activeMatchId: string | null = null;
 let handledRemoteEndMatchId: string | null = null;
 let disconnecting = false;
+let reconnectAttempts = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 const createMatchId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,6 +62,41 @@ const isMatchId = (value: unknown): value is string => typeof value === 'string'
 const clearActiveMatch = () => {
   activeMatchId = null;
   handledRemoteEndMatchId = null;
+};
+
+const clearReconnectTimer = () => {
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+};
+
+const resetReconnectState = () => {
+  reconnectAttempts = 0;
+  clearReconnectTimer();
+};
+
+const scheduleReconnect = () => {
+  if (disconnecting || reconnectTimer !== null || !peer || peer.destroyed) {
+    return;
+  }
+
+  if (shouldGiveUp(reconnectAttempts, RECONNECT_BACKOFF)) {
+    useMoodStore.getState().addToast('Could not reconnect to the multiplayer server. Please refresh.', 'error');
+    useMoodStore.getState().setMultiplayerState({ connectionStatus: 'disconnected' });
+    return;
+  }
+
+  reconnectAttempts += 1;
+  const delay = computeBackoffDelay(reconnectAttempts, RECONNECT_BACKOFF);
+  useMoodStore.getState().setMultiplayerState({ connectionStatus: 'connecting' });
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (peer && !peer.destroyed && !disconnecting) {
+      peer.reconnect();
+    }
+  }, delay);
 };
 
 const handleConnectionLoss = (message: string) => {
@@ -256,6 +301,7 @@ export const initPeer = async () => {
 
     peer.on('open', (id) => {
       console.log('PeerJS connected to signaling server with ID:', id);
+      resetReconnectState();
       useMoodStore.getState().setMultiplayerState({ peerId: id });
     });
 
@@ -276,13 +322,7 @@ export const initPeer = async () => {
         err.type === 'socket-closed'
       ) {
         useMoodStore.getState().addToast('Connection to server lost. Reconnecting...', 'info');
-        if (peer && !peer.destroyed) {
-          setTimeout(() => {
-            if (peer && !peer.destroyed) {
-              peer.reconnect();
-            }
-          }, 2000);
-        }
+        scheduleReconnect();
       } else if (err.type === 'browser-incompatible') {
         useMoodStore.getState().addToast('Your browser does not support multiplayer features.', 'error');
       } else {
@@ -292,13 +332,7 @@ export const initPeer = async () => {
 
     peer.on('disconnected', () => {
       console.log('PeerJS disconnected from signaling server. Attempting to reconnect...');
-      if (peer && !peer.destroyed) {
-        setTimeout(() => {
-          if (peer && !peer.destroyed) {
-            peer.reconnect();
-          }
-        }, 1000);
-      }
+      scheduleReconnect();
     });
   } catch (err: unknown) {
     console.error('Failed to initialize PeerJS:', err);
@@ -370,6 +404,7 @@ export const finishMultiplayerMatch = (score: number) => {
 
 export const disconnectPeer = () => {
   disconnecting = true;
+  resetReconnectState();
   clearActiveMatch();
 
   if (connection) {
